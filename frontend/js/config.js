@@ -1,41 +1,33 @@
 /**
  * config.js — Central configuration
- * Automatically switches between MOCK (local file://) and REAL (production) modes.
  *
- * MOCK mode  : used when opening HTML files directly from disk (file://)
- * REAL mode  : used on Vercel — talks to the Render backend
+ * MODE: MOCK — all data lives in the browser's localStorage via MockDB.
+ * No AWS credentials, no backend calls, no external services required.
+ * Works on Vercel with zero environment variables.
  *
- * ⚠️  Never put AWS credentials here. They live in Render environment variables.
+ * Demo credentials (pre-seeded by mock-db.js):
+ *   Faculty : faculty@demo.com  / Faculty@123
+ *   Student : student@demo.com  / Student@123
+ *   Student : maria@demo.com    / Student@123
  */
 
-// ─── Detect environment ───────────────────────────────────────────────────────
-const _isLocal = (typeof window !== 'undefined') &&
-  (window.location.protocol === 'file:' || window.location.hostname === 'localhost');
-
 const APP_CONFIG = {
-  // ─── Toggle ──────────────────────────────────────────────────────────────
-  // Auto: mock when running locally from disk, real when on Vercel
-  USE_MOCK: _isLocal,
+  // ─── Mode ─────────────────────────────────────────────────────────────────
+  USE_MOCK: true,   // All API calls go to MockDB — no AWS, no backend
 
   // ─── App Metadata ─────────────────────────────────────────────────────────
   APP_NAME: 'EduCloud',
   APP_VERSION: '1.0.0',
   COLLEGE_NAME: 'CloudTech University',
 
-  // ─── Backend (Render) ─────────────────────────────────────────────────────
-  // All API calls go through this Express backend — no direct AWS calls from frontend.
+  // ─── Backend URL (unused in mock mode, kept for reference) ───────────────
   BACKEND_URL: 'https://educloud-backend-jrmy.onrender.com',
 
-  // ─── AWS config block (kept for reference / future use) ───────────────────
-  // Actual secrets live in Render environment variables — never here.
+  // ─── AWS block (unused in mock mode — kept so nothing breaks if referenced)
   AWS: {
     REGION: 'us-east-1',
-    // Legacy field kept so existing api.js http() calls resolve correctly:
     API_GATEWAY_URL: 'https://educloud-backend-jrmy.onrender.com',
-    COGNITO: {
-      USER_POOL_ID: '',   // set in Render env: COGNITO_USER_POOL_ID
-      CLIENT_ID: '',       // set in Render env: COGNITO_CLIENT_ID
-    },
+    COGNITO: { USER_POOL_ID: '', CLIENT_ID: '' },
     S3_BUCKET: 'educloud-assignments-bucket',
   },
 
@@ -50,15 +42,12 @@ const APP_CONFIG = {
 
   // ─── Session ──────────────────────────────────────────────────────────────
   SESSION_KEY: 'educloud_session',
-  TOKEN_KEY: 'educloud_token',
+  TOKEN_KEY:   'educloud_token',
 
   // ─── Pagination ───────────────────────────────────────────────────────────
   PAGE_SIZE: 10,
 };
 
-// Derived helper — used by api.js http() function
-APP_CONFIG.API_BASE = APP_CONFIG.USE_MOCK
-  ? 'MOCK'
-  : APP_CONFIG.BACKEND_URL;
+APP_CONFIG.API_BASE = 'MOCK';
 
 window.APP_CONFIG = APP_CONFIG;
