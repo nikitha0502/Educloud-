@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AWS Architecture — EduCloud</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f0c29; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 40px 20px; }
+    h1 { color: #fff; font-size: 1.75rem; font-weight: 800; margin-bottom: 8px; }
+    p  { color: rgba(255,255,255,.6); font-size: .875rem; margin-bottom: 40px; }
+
+    .diagram { width: 100%; max-width: 1000px; position: relative; }
+    .layer {
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 16px;
+      padding: 20px 24px;
+      margin-bottom: 12px;
+    }
+    .layer-label {
+      font-size: .65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .15em;
+      color: rgba(255,255,255,.35);
+      margin-bottom: 12px;
+    }
+    .layer-row { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; align-items: center; }
+    .service-box {
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.15);
+      border-radius: 12px;
+      padding: 16px 20px;
+      text-align: center;
+      min-width: 130px;
+      transition: all .2s;
+      cursor: default;
+    }
+    .service-box:hover { background: rgba(255,255,255,.14); transform: translateY(-3px); }
+    .service-icon { font-size: 2rem; margin-bottom: 8px; }
+    .service-name { font-size: .8rem; font-weight: 700; color: #fff; }
+    .service-desc { font-size: .7rem; color: rgba(255,255,255,.5); margin-top: 4px; line-height: 1.4; }
+    .arrow { color: rgba(255,255,255,.3); font-size: 1.5rem; text-align: center; padding: 4px 0; }
+    .connector { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 8px 0; }
+    .connector-line { flex: 1; height: 1px; background: linear-gradient(90deg, transparent, rgba(255,255,255,.2), transparent); }
+    .connector-label { font-size: .7rem; color: rgba(255,255,255,.4); font-weight: 600; }
+
+    /* Color accents */
+    .service-box.purple { border-color: #818cf8; }
+    .service-box.cyan   { border-color: #67e8f9; }
+    .service-box.amber  { border-color: #fde68a; }
+    .service-box.green  { border-color: #6ee7b7; }
+    .service-box.orange { border-color: #fdba74; }
+    .service-box.red    { border-color: #fca5a5; }
+    .service-box.blue   { border-color: #93c5fd; }
+
+    .legend { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 32px; }
+    .legend-item { display: flex; align-items: center; gap: 6px; font-size: .75rem; color: rgba(255,255,255,.6); }
+    .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .data-flow {
+      background: rgba(255,255,255,.03);
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 12px;
+      padding: 20px;
+      margin-top: 24px;
+      max-width: 1000px;
+      width: 100%;
+    }
+    .data-flow h3 { color: #a5b4fc; font-size: .875rem; margin-bottom: 16px; }
+    .flow-step { display: flex; align-items: flex-start; gap: 12px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,.06); }
+    .flow-step:last-child { border-bottom: none; }
+    .flow-num { width: 24px; height: 24px; border-radius: 50%; background: #4f46e5; color: #fff; font-size: .75rem; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .flow-text { font-size: .8125rem; color: rgba(255,255,255,.75); line-height: 1.6; }
+    .flow-text strong { color: #a5b4fc; }
+  </style>
+</head>
+<body>
+  <h1>☁️ EduCloud AWS Architecture</h1>
+  <p>Cloud-Based Student Assignment Management System · CloudTech University</p>
+
+  <div class="diagram">
+
+    <!-- Users -->
+    <div class="layer">
+      <div class="layer-label">👤 Users</div>
+      <div class="layer-row">
+        <div class="service-box cyan">
+          <div class="service-icon">🎒</div>
+          <div class="service-name">Student</div>
+          <div class="service-desc">Browse, submit, track assignments</div>
+        </div>
+        <div class="service-box amber">
+          <div class="service-icon">👩‍🏫</div>
+          <div class="service-name">Faculty</div>
+          <div class="service-desc">Create, manage, grade</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow">↕ HTTPS</div>
+
+    <!-- CDN & Hosting -->
+    <div class="layer">
+      <div class="layer-label">🌐 CDN & Static Hosting</div>
+      <div class="layer-row">
+        <div class="service-box blue">
+          <div class="service-icon">🌐</div>
+          <div class="service-name">CloudFront</div>
+          <div class="service-desc">CDN · HTTPS · Edge caching</div>
+        </div>
+        <div class="service-box orange">
+          <div class="service-icon">🪣</div>
+          <div class="service-name">S3 (Frontend)</div>
+          <div class="service-desc">HTML · CSS · JS files</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow">↕ JWT Token</div>
+
+    <!-- Auth -->
+    <div class="layer">
+      <div class="layer-label">🔐 Authentication</div>
+      <div class="layer-row">
+        <div class="service-box purple">
+          <div class="service-icon">🔒</div>
+          <div class="service-name">AWS Cognito</div>
+          <div class="service-desc">User Pools · JWT Tokens<br/>Groups: Students / Faculty</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow">↕ REST API + Auth Header</div>
+
+    <!-- API Gateway -->
+    <div class="layer">
+      <div class="layer-label">🚀 API Management</div>
+      <div class="layer-row">
+        <div class="service-box cyan">
+          <div class="service-icon">🚀</div>
+          <div class="service-name">API Gateway</div>
+          <div class="service-desc">REST endpoints · Authorizer<br/>Rate limiting · CORS</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow">↕ Invokes</div>
+
+    <!-- Lambda -->
+    <div class="layer">
+      <div class="layer-label">⚡ Compute — AWS Lambda (Node.js 18)</div>
+      <div class="layer-row">
+        <div class="service-box green">
+          <div class="service-icon">👤</div>
+          <div class="service-name">Auth Lambda</div>
+          <div class="service-desc">Register · Login</div>
+        </div>
+        <div class="service-box green">
+          <div class="service-icon">📋</div>
+          <div class="service-name">Assignments Lambda</div>
+          <div class="service-desc">CRUD · Validation</div>
+        </div>
+        <div class="service-box green">
+          <div class="service-icon">📤</div>
+          <div class="service-name">Submissions Lambda</div>
+          <div class="service-desc">Submit · Grade · Track</div>
+        </div>
+        <div class="service-box green">
+          <div class="service-icon">🔗</div>
+          <div class="service-name">Files Lambda</div>
+          <div class="service-desc">Pre-signed URLs</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow">↕ Reads/Writes</div>
+
+    <!-- Data Layer -->
+    <div class="layer">
+      <div class="layer-label">🗄️ Data Storage</div>
+      <div class="layer-row">
+        <div class="service-box amber">
+          <div class="service-icon">🗃️</div>
+          <div class="service-name">DynamoDB</div>
+          <div class="service-desc">Users · Assignments<br/>Submissions · GSI queries</div>
+        </div>
+        <div class="service-box red">
+          <div class="service-icon">🪣</div>
+          <div class="service-name">S3 (Files)</div>
+          <div class="service-desc">Assignment docs<br/>Student submissions<br/>Pre-signed URL access</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Data Flow -->
+  <div class="data-flow">
+    <h3>📊 Key Data Flows</h3>
+    <div class="flow-step">
+      <div class="flow-num">1</div>
+      <div class="flow-text"><strong>Registration:</strong> User fills form → Browser calls POST /auth/register → Lambda creates Cognito user + DynamoDB profile → Confirmation email sent</div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num">2</div>
+      <div class="flow-text"><strong>Login:</strong> Credentials → Lambda → Cognito USER_PASSWORD_AUTH → Returns JWT Access Token + ID Token → Token stored in sessionStorage</div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num">3</div>
+      <div class="flow-text"><strong>Assignment Creation:</strong> Faculty fills form → POST /assignments with Bearer token → API Gateway validates Cognito token → Lambda writes to DynamoDB</div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num">4</div>
+      <div class="flow-text"><strong>File Upload:</strong> Student selects file → POST /files/upload-url → Lambda generates S3 Pre-signed PUT URL (valid 5 min) → Browser PUTs file directly to S3 (no credentials exposed) → POST /submissions records metadata in DynamoDB</div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num">5</div>
+      <div class="flow-text"><strong>File Download:</strong> User requests download → POST /files/download-url → Lambda generates S3 Pre-signed GET URL → Browser redirects to signed URL → File served from S3</div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num">6</div>
+      <div class="flow-text"><strong>Grading:</strong> Faculty opens submission → PUT /submissions/{id}/grade with grade+feedback → Lambda updates DynamoDB submission record → Student sees grade on next dashboard load</div>
+    </div>
+  </div>
+
+  <div class="legend" style="margin-top:24px;">
+    <div class="legend-item"><div class="legend-dot" style="background:#818cf8;"></div> Auth Services</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#67e8f9;"></div> User-facing</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#6ee7b7;"></div> Compute</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#fde68a;"></div> Database</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#fca5a5;"></div> Storage</div>
+  </div>
+</body>
+</html>
