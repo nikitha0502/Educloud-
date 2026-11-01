@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Student Submissions — EduCloud</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/design-system.css" />
+  <style>
+    .grade-modal .modal { max-width: 440px; }
+  </style>
+</head>
+<body>
+  <div id="toast-container"></div>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <!-- Grade Modal -->
+  <div class="modal-backdrop grade-modal" id="grade-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title">🏆 Grade Submission</h3>
+        <button class="modal-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="grade-student-info" style="background:var(--gray-50);border-radius:8px;padding:12px;margin-bottom:16px;font-size:.875rem;"></div>
+        <div class="form-group">
+          <label class="form-label" for="grade-input">Grade <span class="required">*</span></label>
+          <input type="number" id="grade-input" class="form-control" min="0" max="1000" placeholder="Enter grade" />
+          <div class="form-hint" id="grade-hint"></div>
+          <div class="form-error" id="grade-error"></div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="feedback-input">Feedback (optional)</label>
+          <textarea id="feedback-input" class="form-control" rows="3" placeholder="Provide feedback to the student…"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" data-modal-close>Cancel</button>
+        <button class="btn btn-primary" id="save-grade-btn">💾 Save Grade</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="app-layout">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-logo">
+        <div class="sidebar-logo-icon">🎓</div>
+        <div><div class="sidebar-logo-text">EduCloud</div><div class="sidebar-logo-sub">Faculty Portal</div></div>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="nav-section"><span class="nav-section-label">Main</span></div>
+        <a class="nav-item" href="faculty-dashboard.html"><span class="nav-icon">🏠</span> Dashboard</a>
+        <a class="nav-item" href="faculty-assignments.html"><span class="nav-icon">📚</span> My Assignments</a>
+        <a class="nav-item" href="create-assignment.html"><span class="nav-icon">➕</span> Create Assignment</a>
+        <a class="nav-item active" href="faculty-submissions.html"><span class="nav-icon">📥</span> Submissions</a>
+        <div class="nav-section"><span class="nav-section-label">Account</span></div>
+        <a class="nav-item" href="profile.html"><span class="nav-icon">👤</span> Profile</a>
+        <a class="nav-item" onclick="logout()"><span class="nav-icon">🚪</span> Sign Out</a>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="user-widget">
+          <div class="user-avatar" id="sidebar-avatar">FC</div>
+          <div><div class="user-name" id="sidebar-name">Faculty</div><div class="user-role">Faculty</div></div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar">
+        <button class="menu-toggle btn btn-ghost btn-icon" id="menu-toggle">☰</button>
+        <h1 class="topbar-title">Student Submissions</h1>
+      </header>
+
+      <div class="page-content" id="page-content">
+        <div class="spinner"></div>
+      </div>
+    </main>
+  </div>
+
+  <script src="../js/config.js"></script>
+  <script src="../js/mock-db.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/utils.js"></script>
+  <script>
+    const user = API.requireRole('faculty', 'login.html');
+    if (!user) throw new Error();
+
+    showMockBanner();
+    initModals();
+    document.getElementById('sidebar-name').textContent = user.name;
+    document.getElementById('sidebar-avatar').textContent = getInitials(user.name);
+
+    document.getElementById('menu-toggle').addEventListener('click', () => {
+      document.getElementById('sidebar').classList.toggle('mobile-open');
+      document.getElementById('sidebar-overlay').classList.toggle('active');
+    });
+
+    const params = new URLSearchParams(window.location.search);
+    const filterAssignmentId = params.get('assignmentId');
+
+    let allSubmissions = [], allAssignments = [];
+    let query = '', asgnFilter = filterAssignmentId || 'all', statusFilter = 'all', page = 1;
+    let gradeContext = {};
+
+    async function load() {
+      const [subRes, asgnRes] = await Promise.all([
+        API.Submissions.getByFaculty(user.userId),
+        API.Assignments.getByFaculty(user.userId),
+      ]);
+      allSubmissions = subRes.submissions || [];
+      allAssignments = asgnRes.assignments || [];
+      renderPage();
+    }
+
+    function renderPage() {
+      let filtered = allSubmissions.filter(s => {
+        if (query) {
+          const q = query.toLowerCase();
+          const asgn = allAssignments.find(a => a.assignmentId === s.assignmentId);
+          if (!s.studentName.toLowerCase().includes(q) && !(asgn?.title||'').toLowerCase().includes(q) && !(s.fileName||'').toLowerCase().includes(q)) return false;
+        }
+        if (asgnFilter !== 'all' && s.assignmentId !== asgnFilter) return false;
+        if (statusFilter === 'late' && !s.isLate) return false;
+        if (statusFilter === 'ontime' && s.isLate) return false;
+        if (statusFilter === 'graded' && s.grade === null) return false;
+        if (statusFilter === 'ungraded' && s.grade !== null) return false;
+        return true;
+      }).sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt));
+
+      const graded = filtered.filter(s => s.grade !== null).length;
+      const late   = filtered.filter(s => s.isLate).length;
+
+      const pg = paginate(filtered, page, APP_CONFIG.PAGE_SIZE);
+
+      const html = `
+        <div class="page-header">
+          <div class="page-header-text">
+            <h2>📥 Student Submissions</h2>
+            <p>${filtered.length} submission${filtered.length !== 1 ? 's' : ''}</p>
+          </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="grid grid-cols-4 gap-4" style="margin-bottom:var(--space-5);">
+          <div class="stat-card"><div class="stat-icon purple">📥</div><div><div class="stat-value">${filtered.length}</div><div class="stat-label">Total</div></div></div>
+          <div class="stat-card"><div class="stat-icon green">🏆</div><div><div class="stat-value">${graded}</div><div class="stat-label">Graded</div></div></div>
+          <div class="stat-card"><div class="stat-icon amber">⏳</div><div><div class="stat-value">${filtered.length - graded}</div><div class="stat-label">Pending Grade</div></div></div>
+          <div class="stat-card"><div class="stat-icon red">⚠️</div><div><div class="stat-value">${late}</div><div class="stat-label">Late</div></div></div>
+        </div>
+
+        <!-- Filters -->
+        <div class="filter-bar" style="margin-bottom:var(--space-5);">
+          <div class="filter-search">
+            <span class="search-icon">🔍</span>
+            <input type="text" placeholder="Search student, assignment…" id="search-input" value="${escapeHtml(query)}" />
+          </div>
+          <select class="form-control" id="asgn-filter" style="max-width:200px;">
+            <option value="all">All Assignments</option>
+            ${allAssignments.map(a => `<option value="${a.assignmentId}" ${asgnFilter===a.assignmentId?'selected':''}>${escapeHtml(a.title.length > 30 ? a.title.slice(0,30)+'…' : a.title)}</option>`).join('')}
+          </select>
+          <select class="form-control" id="status-filter" style="max-width:140px;">
+            <option value="all" ${statusFilter==='all'?'selected':''}>All Status</option>
+            <option value="ontime" ${statusFilter==='ontime'?'selected':''}>On Time</option>
+            <option value="late" ${statusFilter==='late'?'selected':''}>Late</option>
+            <option value="graded" ${statusFilter==='graded'?'selected':''}>Graded</option>
+            <option value="ungraded" ${statusFilter==='ungraded'?'selected':''}>Ungraded</option>
+          </select>
+        </div>
+
+        ${pg.items.length === 0
+          ? `<div class="empty-state"><div class="empty-state-icon">📭</div><h3>No submissions</h3><p>No submissions match your filters.</p></div>`
+          : `<div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Student</th>
+                    <th>Assignment</th>
+                    <th>Submitted</th>
+                    <th>File</th>
+                    <th>Status</th>
+                    <th>Grade</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${pg.items.map(s => {
+                    const asgn = allAssignments.find(a => a.assignmentId === s.assignmentId);
+                    return `
+                    <tr>
+                      <td>
+                        <div style="font-weight:700;">${escapeHtml(s.studentName)}</div>
+                      </td>
+                      <td>
+                        <div>${asgn ? escapeHtml(asgn.title) : '—'}</div>
+                        <div style="font-size:.75rem;color:var(--gray-500);">${asgn ? `${asgn.totalMarks} marks` : ''}</div>
+                      </td>
+                      <td>
+                        <div>${formatDate(s.submittedAt)}</div>
+                        <div style="font-size:.75rem;color:var(--gray-500);">${timeAgo(s.submittedAt)}</div>
+                      </td>
+                      <td>
+                        <div style="display:flex;align-items:center;gap:6px;font-size:.8125rem;">
+                          ${getFileIcon(s.fileName)}
+                          <span>${escapeHtml(s.fileName||'File')}</span>
+                        </div>
+                        <div style="font-size:.7rem;color:var(--gray-400);">${formatFileSize(s.fileSize)}</div>
+                      </td>
+                      <td>${s.isLate ? '<span class="badge badge-warning">Late</span>' : '<span class="badge badge-success">On Time</span>'}</td>
+                      <td>
+                        ${s.grade !== null
+                          ? `<span style="font-weight:700;color:var(--success);">${s.grade}/${asgn?asgn.totalMarks:'?'}</span>`
+                          : '<span style="color:var(--gray-400);">—</span>'
+                        }
+                      </td>
+                      <td>
+                        <div class="table-actions">
+                          <button class="btn btn-outline btn-sm" onclick="openGrade('${s.submissionId}','${escapeHtml(s.studentName)}',${s.grade||0},'${escapeHtml(s.feedback||'')}',${asgn?asgn.totalMarks:100})">
+                            ${s.grade !== null ? '✏️ Edit' : '🏆 Grade'}
+                          </button>
+                          <button class="btn btn-ghost btn-sm" onclick="download('${escapeHtml(s.fileKey)}','${escapeHtml(s.fileName)}')">⬇️</button>
+                        </div>
+                      </td>
+                    </tr>`;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
+            <div id="pagination-container"></div>`
+        }
+      `;
+
+      document.getElementById('page-content').innerHTML = html;
+      document.getElementById('search-input')?.addEventListener('input', debounce(e => { query = e.target.value; page = 1; renderPage(); }, 300));
+      document.getElementById('asgn-filter')?.addEventListener('change', e => { asgnFilter = e.target.value; page = 1; renderPage(); });
+      document.getElementById('status-filter')?.addEventListener('change', e => { statusFilter = e.target.value; page = 1; renderPage(); });
+      renderPagination('pagination-container', pg, p => { page = p; renderPage(); });
+    }
+
+    function openGrade(subId, studentName, currentGrade, currentFeedback, maxMarks) {
+      gradeContext = { subId, maxMarks };
+      document.getElementById('grade-student-info').textContent = `Student: ${studentName}`;
+      document.getElementById('grade-input').value = currentGrade || '';
+      document.getElementById('grade-input').max = maxMarks;
+      document.getElementById('grade-hint').textContent = `Max marks: ${maxMarks}`;
+      document.getElementById('feedback-input').value = currentFeedback || '';
+      document.getElementById('grade-error').classList.remove('visible');
+      openModal('grade-modal');
+    }
+
+    document.getElementById('save-grade-btn').addEventListener('click', async () => {
+      const gradeVal = parseInt(document.getElementById('grade-input').value);
+      if (isNaN(gradeVal) || gradeVal < 0 || gradeVal > gradeContext.maxMarks) {
+        document.getElementById('grade-error').textContent = `Enter a grade between 0 and ${gradeContext.maxMarks}.`;
+        document.getElementById('grade-error').classList.add('visible');
+        return;
+      }
+      document.getElementById('grade-error').classList.remove('visible');
+
+      const btn = document.getElementById('save-grade-btn');
+      btn.disabled = true;
+      btn.innerHTML = '<div class="spinner spinner-sm"></div> Saving…';
+
+      const res = await API.Submissions.addGrade(gradeContext.subId, {
+        grade: gradeVal,
+        feedback: document.getElementById('feedback-input').value.trim(),
+      });
+
+      btn.disabled = false;
+      btn.innerHTML = '💾 Save Grade';
+
+      if (res.success) {
+        closeModal('grade-modal');
+        showToast('Grade saved!', 'success');
+        load();
+      } else {
+        showToast(res.message || 'Failed to save grade.', 'danger');
+      }
+    });
+
+    async function download(fileKey, fileName) {
+      showLoading('Preparing download…');
+      try {
+        const res = await API.Files.getDownloadUrl(fileKey, fileName);
+        hideLoading();
+        if (res.downloadUrl) {
+          const a = document.createElement('a');
+          a.href = res.downloadUrl;
+          a.download = res.fileName || fileName || 'submission.pdf';
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          showToast(`Downloaded ${res.fileName || fileName}`, 'success');
+        }
+      } catch (err) {
+        hideLoading();
+        showToast(err.message || 'Download failed', 'danger');
+      }
+    }
+
+    load();
+  </script>
+</body>
+</html>
