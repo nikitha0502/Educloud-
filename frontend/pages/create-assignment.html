@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Create Assignment — EduCloud</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/design-system.css" />
+  <style>
+    .form-section { background: var(--bg-card); border-radius: var(--radius-lg); border: 1px solid var(--gray-200); padding: var(--space-6); margin-bottom: var(--space-5); }
+    .form-section-title { font-size: .875rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--primary); margin-bottom: var(--space-4); display: flex; align-items: center; gap: 8px; }
+    .form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+    @media(max-width:640px){ .form-row-2 { grid-template-columns: 1fr; } }
+    .char-count { font-size: .75rem; color: var(--gray-400); text-align: right; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <div id="toast-container"></div>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <div class="app-layout">
+    <!-- SIDEBAR -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-logo">
+        <div class="sidebar-logo-icon">🎓</div>
+        <div><div class="sidebar-logo-text">EduCloud</div><div class="sidebar-logo-sub">Faculty Portal</div></div>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="nav-section"><span class="nav-section-label">Main</span></div>
+        <a class="nav-item" href="faculty-dashboard.html"><span class="nav-icon">🏠</span> Dashboard</a>
+        <a class="nav-item" href="faculty-assignments.html"><span class="nav-icon">📚</span> My Assignments</a>
+        <a class="nav-item active" href="create-assignment.html"><span class="nav-icon">➕</span> Create Assignment</a>
+        <a class="nav-item" href="faculty-submissions.html"><span class="nav-icon">📥</span> Submissions</a>
+        <div class="nav-section"><span class="nav-section-label">Account</span></div>
+        <a class="nav-item" href="profile.html"><span class="nav-icon">👤</span> Profile</a>
+        <a class="nav-item" onclick="logout()"><span class="nav-icon">🚪</span> Sign Out</a>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="user-widget">
+          <div class="user-avatar" id="sidebar-avatar">FC</div>
+          <div><div class="user-name" id="sidebar-name">Faculty</div><div class="user-role">Faculty</div></div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar">
+        <button class="menu-toggle btn btn-ghost btn-icon" id="menu-toggle">☰</button>
+        <h1 class="topbar-title" id="page-title">Create Assignment</h1>
+        <div class="topbar-actions">
+          <a href="faculty-assignments.html" class="btn btn-ghost btn-sm">← Back</a>
+        </div>
+      </header>
+
+      <div class="page-content">
+        <div class="page-header">
+          <div class="page-header-text">
+            <h2 id="form-heading">📋 Create New Assignment</h2>
+            <p>Fill in the details below to create a new assignment for students.</p>
+          </div>
+        </div>
+
+        <form id="assignment-form" novalidate>
+          <!-- Basic Info -->
+          <div class="form-section">
+            <div class="form-section-title">📝 Basic Information</div>
+            <div class="form-group">
+              <label class="form-label" for="title">Assignment Title <span class="required">*</span></label>
+              <input type="text" id="title" class="form-control" placeholder="e.g. Cloud Architecture Design Project" maxlength="120" oninput="updateCharCount(this,'title-count',120)" />
+              <div class="char-count"><span id="title-count">0</span>/120</div>
+              <div class="form-error" id="title-error"></div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="description">Description <span class="required">*</span></label>
+              <textarea id="description" class="form-control" rows="4" placeholder="Provide a clear description of the assignment objectives, requirements, and deliverables." maxlength="1000" oninput="updateCharCount(this,'desc-count',1000)"></textarea>
+              <div class="char-count"><span id="desc-count">0</span>/1000</div>
+              <div class="form-error" id="desc-error"></div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="instructions">Detailed Instructions</label>
+              <textarea id="instructions" class="form-control" rows="4" placeholder="Add step-by-step instructions, submission format requirements, or any special notes." maxlength="2000" oninput="updateCharCount(this,'instr-count',2000)"></textarea>
+              <div class="char-count"><span id="instr-count">0</span>/2000</div>
+            </div>
+          </div>
+
+          <!-- Deadline & Marks -->
+          <div class="form-section">
+            <div class="form-section-title">⚙️ Settings</div>
+            <div class="form-row-2">
+              <div class="form-group">
+                <label class="form-label" for="deadline">Submission Deadline <span class="required">*</span></label>
+                <input type="datetime-local" id="deadline" class="form-control" />
+                <div class="form-hint">Students cannot submit after this date/time (unless late submissions are allowed).</div>
+                <div class="form-error" id="deadline-error"></div>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="total-marks">Total Marks <span class="required">*</span></label>
+                <input type="number" id="total-marks" class="form-control" placeholder="e.g. 100" min="1" max="1000" value="100" />
+                <div class="form-error" id="marks-error"></div>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:.9rem;font-weight:500;color:var(--gray-700);">
+                <input type="checkbox" id="allow-late" />
+                <span>Allow late submissions (students can submit after the deadline)</span>
+              </label>
+              <div class="form-hint">When enabled, late submissions will be marked as "Late" but still accepted.</div>
+            </div>
+          </div>
+
+          <!-- Attachment -->
+          <div class="form-section">
+            <div class="form-section-title">📎 Reference Document (Optional)</div>
+            <p style="font-size:.875rem;color:var(--gray-500);margin-bottom:16px;">Upload assignment instructions, reference materials, or supporting documents for students to download.</p>
+            <div class="file-upload-area" id="file-upload-area">
+              <div class="upload-icon">📄</div>
+              <p><span>Click to upload</span> or drag &amp; drop a file here</p>
+              <p style="font-size:.75rem;margin-top:4px;">PDF or DOCX · Max 25MB</p>
+              <input type="file" id="attachment-file" accept=".pdf,.docx" />
+            </div>
+            <div id="file-preview" style="display:none;margin-top:12px;background:var(--gray-50);border-radius:8px;padding:12px 16px;display:none;align-items:center;justify-content:space-between;">
+              <div style="display:flex;align-items:center;gap:10px;">
+                <span id="file-icon" style="font-size:1.5rem;">📄</span>
+                <div>
+                  <div id="file-name" style="font-weight:600;font-size:.9rem;"></div>
+                  <div id="file-size" style="font-size:.75rem;color:var(--gray-500);"></div>
+                </div>
+              </div>
+              <button type="button" class="btn btn-ghost btn-sm" onclick="clearFile()">✕ Remove</button>
+            </div>
+            <div class="form-error" id="file-error"></div>
+          </div>
+
+          <!-- Submit -->
+          <div style="display:flex;gap:12px;flex-wrap:wrap;">
+            <button type="submit" class="btn btn-primary btn-lg" id="submit-btn">
+              📋 Create Assignment
+            </button>
+            <a href="faculty-assignments.html" class="btn btn-ghost btn-lg">Cancel</a>
+          </div>
+        </form>
+      </div>
+    </main>
+  </div>
+
+  <script src="../js/config.js"></script>
+  <script src="../js/mock-db.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/utils.js"></script>
+  <script>
+    const user = API.requireRole('faculty', 'login.html');
+    if (!user) throw new Error();
+
+    showMockBanner();
+    document.getElementById('sidebar-name').textContent = user.name;
+    document.getElementById('sidebar-avatar').textContent = getInitials(user.name);
+
+    document.getElementById('menu-toggle').addEventListener('click', () => {
+      document.getElementById('sidebar').classList.toggle('mobile-open');
+      document.getElementById('sidebar-overlay').classList.toggle('active');
+    });
+
+    // Set default deadline to 7 days from now
+    const defDeadline = new Date(Date.now() + 7 * 86400000);
+    defDeadline.setSeconds(0, 0);
+    document.getElementById('deadline').value = defDeadline.toISOString().slice(0, 16);
+
+    // Check for edit mode
+    const params = new URLSearchParams(window.location.search);
+    const editId = params.get('edit');
+    let editMode = false;
+
+    async function initEditMode(id) {
+      showLoading('Loading assignment…');
+      const res = await API.Assignments.getById(id);
+      hideLoading();
+      if (!res.success) { showToast('Assignment not found.', 'danger'); return; }
+      const a = res.assignment;
+      editMode = true;
+      document.getElementById('page-title').textContent = 'Edit Assignment';
+      document.getElementById('form-heading').textContent = '✏️ Edit Assignment';
+      document.getElementById('submit-btn').textContent = '💾 Save Changes';
+      document.getElementById('title').value = a.title;
+      document.getElementById('description').value = a.description;
+      document.getElementById('instructions').value = a.instructions || '';
+      document.getElementById('deadline').value = new Date(a.deadline).toISOString().slice(0, 16);
+      document.getElementById('total-marks').value = a.totalMarks;
+      document.getElementById('allow-late').checked = a.allowLate;
+      updateCharCount(document.getElementById('title'), 'title-count', 120);
+      updateCharCount(document.getElementById('description'), 'desc-count', 1000);
+      updateCharCount(document.getElementById('instructions'), 'instr-count', 2000);
+    }
+
+    if (editId) initEditMode(editId);
+
+    // Char counter
+    function updateCharCount(el, countId, max) {
+      document.getElementById(countId).textContent = el.value.length;
+    }
+
+    // File upload
+    const fileArea = document.getElementById('file-upload-area');
+    const fileInput = document.getElementById('attachment-file');
+    let selectedFile = null;
+
+    fileArea.addEventListener('click', () => fileInput.click());
+    fileArea.addEventListener('dragover', e => { e.preventDefault(); fileArea.classList.add('drag-over'); });
+    fileArea.addEventListener('dragleave', () => fileArea.classList.remove('drag-over'));
+    fileArea.addEventListener('drop', e => {
+      e.preventDefault();
+      fileArea.classList.remove('drag-over');
+      const file = e.dataTransfer.files[0];
+      if (file) handleFile(file);
+    });
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files[0]) handleFile(fileInput.files[0]);
+    });
+
+    function handleFile(file) {
+      const v = validateFile(file);
+      if (!v.valid) {
+        document.getElementById('file-error').textContent = v.message;
+        document.getElementById('file-error').classList.add('visible');
+        return;
+      }
+      document.getElementById('file-error').classList.remove('visible');
+      selectedFile = file;
+      document.getElementById('file-name').textContent = file.name;
+      document.getElementById('file-size').textContent = formatFileSize(file.size);
+      document.getElementById('file-icon').textContent = getFileIcon(file.name);
+      const preview = document.getElementById('file-preview');
+      preview.style.display = 'flex';
+      fileArea.style.display = 'none';
+    }
+
+    function clearFile() {
+      selectedFile = null;
+      fileInput.value = '';
+      document.getElementById('file-preview').style.display = 'none';
+      document.getElementById('file-upload-area').style.display = 'flex';
+    }
+
+    // Form submit
+    document.getElementById('assignment-form').addEventListener('submit', async function(e) {
+      e.preventDefault();
+
+      let valid = true;
+      valid = validateRequired('title', 'title-error', 'Assignment title is required.') && valid;
+      valid = validateRequired('description', 'desc-error', 'Description is required.') && valid;
+
+      const deadline = document.getElementById('deadline').value;
+      if (!deadline) {
+        document.getElementById('deadline').classList.add('is-invalid');
+        document.getElementById('deadline-error').textContent = 'Deadline is required.';
+        document.getElementById('deadline-error').classList.add('visible');
+        valid = false;
+      } else if (new Date(deadline) <= new Date() && !editMode) {
+        document.getElementById('deadline').classList.add('is-invalid');
+        document.getElementById('deadline-error').textContent = 'Deadline must be in the future.';
+        document.getElementById('deadline-error').classList.add('visible');
+        valid = false;
+      } else {
+        document.getElementById('deadline').classList.remove('is-invalid');
+        document.getElementById('deadline-error').classList.remove('visible');
+      }
+
+      const marks = parseInt(document.getElementById('total-marks').value);
+      if (!marks || marks < 1 || marks > 1000) {
+        document.getElementById('total-marks').classList.add('is-invalid');
+        document.getElementById('marks-error').textContent = 'Enter marks between 1 and 1000.';
+        document.getElementById('marks-error').classList.add('visible');
+        valid = false;
+      } else {
+        document.getElementById('total-marks').classList.remove('is-invalid');
+        document.getElementById('marks-error').classList.remove('visible');
+      }
+
+      if (!valid) return;
+
+      const btn = document.getElementById('submit-btn');
+      btn.disabled = true;
+      btn.innerHTML = '<div class="spinner spinner-sm"></div> Saving…';
+
+      try {
+        let attachmentKey = null;
+        let attachmentName = null;
+
+        if (selectedFile) {
+          attachmentName = selectedFile.name;
+          const urlRes = await API.Files.getUploadUrl(selectedFile.name, selectedFile.type);
+          if (urlRes && urlRes.success) {
+            attachmentKey = urlRes.fileKey;
+            await API.Files.uploadToS3(urlRes.uploadUrl, selectedFile, attachmentKey);
+          }
+        }
+
+        const payload = {
+          title: document.getElementById('title').value.trim(),
+          description: document.getElementById('description').value.trim(),
+          instructions: document.getElementById('instructions').value.trim(),
+          facultyId: user.userId,
+          facultyName: user.name,
+          deadline: new Date(deadline).toISOString(),
+          totalMarks: marks,
+          allowLate: document.getElementById('allow-late').checked,
+          attachmentKey: attachmentKey || (editMode && selectedAssignment ? selectedAssignment.attachmentKey : null),
+          attachmentName: attachmentName || (editMode && selectedAssignment ? selectedAssignment.attachmentName : null),
+        };
+
+        let res;
+        if (editMode) {
+          res = await API.Assignments.update(editId, payload);
+        } else {
+          res = await API.Assignments.create(payload);
+        }
+
+        if (!res.success) {
+          showToast(res.message || 'Failed to save.', 'danger');
+          return;
+        }
+
+        showToast(editMode ? 'Assignment updated!' : 'Assignment created successfully! 🎉', 'success');
+        setTimeout(() => { window.location.href = 'faculty-assignments.html'; }, 1000);
+
+      } catch (err) {
+        showToast(err.message || 'An error occurred.', 'danger');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = editMode ? '💾 Save Changes' : '📋 Create Assignment';
+      }
+    });
+  </script>
+</body>
+</html>
