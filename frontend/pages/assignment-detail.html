@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Assignment Details — EduCloud</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/design-system.css" />
+  <style>
+    .detail-hero {
+      background: linear-gradient(135deg, #312e81, #4f46e5);
+      border-radius: var(--radius-xl);
+      padding: var(--space-8);
+      color: #fff;
+      margin-bottom: var(--space-6);
+    }
+    .detail-hero h2 { font-size: 1.75rem; font-weight: 800; margin-bottom: var(--space-3); }
+    .detail-hero p  { color: rgba(255,255,255,.8); line-height: 1.7; font-size: 1rem; margin-bottom: var(--space-5); }
+    .meta-chips { display: flex; flex-wrap: wrap; gap: 10px; }
+    .meta-chip {
+      background: rgba(255,255,255,.15);
+      color: #fff;
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: .8125rem;
+      font-weight: 600;
+    }
+    .section-block { background: var(--bg-card); border-radius: var(--radius-lg); border: 1px solid var(--gray-200); padding: var(--space-6); margin-bottom: var(--space-5); }
+    .section-block h3 { font-size: 1rem; font-weight: 700; color: var(--gray-900); margin-bottom: var(--space-4); display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--gray-100); padding-bottom: var(--space-3); }
+    .instructions-text { font-size: .9375rem; color: var(--gray-700); line-height: 1.8; white-space: pre-wrap; }
+    .countdown-display {
+      text-align: center;
+      padding: var(--space-6);
+      background: linear-gradient(135deg, var(--gray-50), #eef2ff);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--gray-200);
+    }
+    .countdown-time { font-size: 2.5rem; font-weight: 800; color: var(--primary); }
+    .countdown-label { font-size: .875rem; color: var(--gray-500); margin-top: 4px; }
+    .submission-status-block { border-radius: var(--radius-lg); padding: var(--space-5); text-align: center; }
+    .submission-status-block.submitted { background: #d1fae5; }
+    .submission-status-block.pending   { background: #dbeafe; }
+    .submission-status-block.overdue   { background: #fee2e2; }
+    .submission-status-block .status-icon { font-size: 2.5rem; margin-bottom: 8px; }
+    .submission-status-block h4 { font-size: 1.125rem; font-weight: 700; margin-bottom: 4px; }
+    .submission-status-block p  { font-size: .875rem; }
+  </style>
+</head>
+<body>
+  <div id="toast-container"></div>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <div class="app-layout">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-logo">
+        <div class="sidebar-logo-icon">🎓</div>
+        <div><div class="sidebar-logo-text">EduCloud</div><div class="sidebar-logo-sub" id="portal-label">Portal</div></div>
+      </div>
+      <nav class="sidebar-nav" id="sidebar-nav"></nav>
+      <div class="sidebar-footer">
+        <div class="user-widget">
+          <div class="user-avatar" id="sidebar-avatar">U</div>
+          <div><div class="user-name" id="sidebar-name">Loading…</div><div class="user-role" id="sidebar-role">User</div></div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar">
+        <button class="menu-toggle btn btn-ghost btn-icon" id="menu-toggle">☰</button>
+        <h1 class="topbar-title">Assignment Details</h1>
+        <div class="topbar-actions">
+          <button class="btn btn-ghost btn-sm" onclick="history.back()">← Back</button>
+        </div>
+      </header>
+      <div class="page-content" id="page-content">
+        <div class="spinner"></div>
+      </div>
+    </main>
+  </div>
+
+  <script src="../js/config.js"></script>
+  <script src="../js/mock-db.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/utils.js"></script>
+  <script>
+    const user = API.requireAuth('login.html');
+    if (!user) throw new Error();
+
+    showMockBanner();
+    document.getElementById('sidebar-name').textContent = user.name;
+    document.getElementById('sidebar-avatar').textContent = getInitials(user.name);
+    document.getElementById('sidebar-role').textContent = user.role === 'faculty' ? 'Faculty' : 'Student';
+    document.getElementById('portal-label').textContent = user.role === 'faculty' ? 'Faculty Portal' : 'Student Portal';
+
+    const navLinks = user.role === 'faculty' ? `
+      <a class="nav-item" href="faculty-dashboard.html"><span class="nav-icon">🏠</span> Dashboard</a>
+      <a class="nav-item" href="faculty-assignments.html"><span class="nav-icon">📚</span> My Assignments</a>
+      <a class="nav-item" href="create-assignment.html"><span class="nav-icon">➕</span> Create Assignment</a>
+      <a class="nav-item" href="faculty-submissions.html"><span class="nav-icon">📥</span> Submissions</a>
+      <a class="nav-item" onclick="logout()"><span class="nav-icon">🚪</span> Sign Out</a>
+    ` : `
+      <a class="nav-item" href="student-dashboard.html"><span class="nav-icon">🏠</span> Dashboard</a>
+      <a class="nav-item active" href="assignments.html"><span class="nav-icon">📚</span> Assignments</a>
+      <a class="nav-item" href="upload-submission.html"><span class="nav-icon">📤</span> Submit Work</a>
+      <a class="nav-item" href="submission-history.html"><span class="nav-icon">📋</span> My Submissions</a>
+      <a class="nav-item" onclick="logout()"><span class="nav-icon">🚪</span> Sign Out</a>
+    `;
+    document.getElementById('sidebar-nav').innerHTML = navLinks;
+
+    document.getElementById('menu-toggle').addEventListener('click', () => {
+      document.getElementById('sidebar').classList.toggle('mobile-open');
+      document.getElementById('sidebar-overlay').classList.toggle('active');
+    });
+
+    const params = new URLSearchParams(window.location.search);
+    const assignmentId = params.get('id');
+
+    if (!assignmentId) {
+      document.getElementById('page-content').innerHTML = '<div class="alert alert-danger"><span>❌</span> No assignment ID provided.</div>';
+    } else {
+      loadDetail(assignmentId);
+    }
+
+    async function loadDetail(id) {
+      try {
+        const [asgnRes, subRes] = await Promise.all([
+          API.Assignments.getById(id),
+          user.role === 'student'
+            ? API.Submissions.getByStudent(user.userId)
+            : API.Submissions.getByAssignment(id),
+        ]);
+
+        if (!asgnRes.success) {
+          document.getElementById('page-content').innerHTML = '<div class="alert alert-danger"><span>❌</span> Assignment not found.</div>';
+          return;
+        }
+
+        const asgn = asgnRes.assignment;
+        const submissions = subRes.submissions || [];
+        const mySubmission = user.role === 'student'
+          ? submissions.find(s => s.assignmentId === id)
+          : null;
+
+        renderDetail(asgn, submissions, mySubmission);
+      } catch (err) {
+        document.getElementById('page-content').innerHTML = `<div class="alert alert-danger"><span>❌</span> ${escapeHtml(err.message)}</div>`;
+      }
+    }
+
+    function renderDetail(asgn, submissions, mySubmission) {
+      const now = new Date();
+      const isExpired = new Date(asgn.deadline) < now;
+      const cd = deadlineCountdown(asgn.deadline);
+
+      let countdownClass = 'deadline-chip safe';
+      if (cd.expired) countdownClass = 'deadline-chip expired';
+      else if (cd.class === 'deadline-danger') countdownClass = 'deadline-chip danger';
+      else if (cd.class === 'deadline-warning') countdownClass = 'deadline-chip warning';
+
+      const studentStatusBlock = () => {
+        if (mySubmission) {
+          return `
+          <div class="submission-status-block submitted">
+            <div class="status-icon">✅</div>
+            <h4 style="color:#065f46;">Submitted Successfully</h4>
+            <p style="color:#065f46;">${escapeHtml(mySubmission.fileName)} · ${formatDateTime(mySubmission.submittedAt)}</p>
+            ${mySubmission.isLate ? '<span class="badge badge-warning" style="margin-top:8px;">Submitted Late</span>' : ''}
+            ${mySubmission.grade !== null ? `<div style="margin-top:12px;font-size:1.25rem;font-weight:700;color:var(--success);">Grade: ${mySubmission.grade}/${asgn.totalMarks}</div>` : ''}
+            ${mySubmission.feedback ? `<div style="margin-top:8px;font-size:.875rem;color:var(--gray-700);font-style:italic;">"${escapeHtml(mySubmission.feedback)}"</div>` : ''}
+          </div>`;
+        }
+        if (isExpired && !asgn.allowLate) {
+          return `
+          <div class="submission-status-block overdue">
+            <div class="status-icon">⏰</div>
+            <h4 style="color:#991b1b;">Submission Closed</h4>
+            <p style="color:#991b1b;">The deadline has passed and late submissions are not allowed.</p>
+          </div>`;
+        }
+        return `
+        <div class="submission-status-block pending">
+          <div class="status-icon">📤</div>
+          <h4 style="color:#1e40af;">Not Yet Submitted</h4>
+          <p style="color:#1e40af;">Upload your assignment before the deadline.</p>
+          ${isExpired ? '<span class="badge badge-warning" style="margin-top:8px;">Late submission allowed</span>' : ''}
+          <a href="upload-submission.html?assignmentId=${asgn.assignmentId}" class="btn btn-primary" style="margin-top:16px;">📤 Submit Now</a>
+        </div>`;
+      };
+
+      const facultySubmissionsBlock = () => `
+        <div class="section-block">
+          <h3>📥 Student Submissions (${submissions.length})</h3>
+          ${submissions.length === 0
+            ? '<div class="empty-state" style="padding:20px;"><div class="empty-state-icon">📭</div><p>No submissions yet.</p></div>'
+            : `<div class="table-wrapper">
+                <table>
+                  <thead><tr><th>Student</th><th>Submitted At</th><th>File</th><th>Status</th><th>Grade</th><th>Actions</th></tr></thead>
+                  <tbody>
+                    ${submissions.map(s => `
+                    <tr>
+                      <td><strong>${escapeHtml(s.studentName)}</strong></td>
+                      <td>${formatDateTime(s.submittedAt)}</td>
+                      <td>${escapeHtml(s.fileName || 'File')}</td>
+                      <td>${s.isLate ? '<span class="badge badge-warning">Late</span>' : '<span class="badge badge-success">On Time</span>'}</td>
+                      <td>${s.grade !== null ? `<strong>${s.grade}</strong>` : '<span class="text-muted">—</span>'}</td>
+                      <td>
+                        <div class="table-actions">
+                          <button class="btn btn-outline btn-sm" onclick="showGradeModal('${s.submissionId}','${escapeHtml(s.studentName)}',${s.grade || 0},'${escapeHtml(s.feedback || '')}')">
+                            ${s.grade !== null ? '✏️ Edit Grade' : '🏆 Grade'}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>`).join('')}
+                  </tbody>
+                </table>
+              </div>`
+          }
+        </div>`;
+
+      const html = `
+        <div class="detail-hero">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:12px;">
+            <h2>${escapeHtml(asgn.title)}</h2>
+            ${assignmentStatusBadge(asgn.status, asgn.deadline)}
+          </div>
+          <p>${escapeHtml(asgn.description)}</p>
+          <div class="meta-chips">
+            <span class="meta-chip">👩‍🏫 ${escapeHtml(asgn.facultyName || 'Faculty')}</span>
+            <span class="meta-chip">🏆 ${asgn.totalMarks} Marks</span>
+            <span class="meta-chip">📅 Due: ${formatDateTime(asgn.deadline)}</span>
+            <span class="meta-chip">📋 Created: ${formatDate(asgn.createdAt)}</span>
+            ${asgn.allowLate ? '<span class="meta-chip">✅ Late Submissions Allowed</span>' : ''}
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-6" style="margin-bottom:var(--space-5);">
+          <!-- Countdown -->
+          <div class="countdown-display">
+            <div class="countdown-time ${cd.class}">${cd.text}</div>
+            <div class="countdown-label">until deadline</div>
+            <div style="margin-top:8px;font-size:.875rem;color:var(--gray-500);">${formatDateTime(asgn.deadline)}</div>
+          </div>
+
+          <!-- Submission Status -->
+          ${user.role === 'student' ? studentStatusBlock() : `
+          <div class="section-block" style="margin:0;">
+            <h3>📊 Quick Stats</h3>
+            <div class="grid grid-cols-2 gap-4">
+              <div class="stat-card"><div class="stat-icon green">📥</div><div><div class="stat-value">${submissions.length}</div><div class="stat-label">Submissions</div></div></div>
+              <div class="stat-card"><div class="stat-icon amber">⏳</div><div><div class="stat-value">${submissions.filter(s=>s.grade===null).length}</div><div class="stat-label">To Grade</div></div></div>
+            </div>
+          </div>`}
+        </div>
+
+        <!-- Instructions -->
+        ${asgn.instructions ? `
+        <div class="section-block">
+          <h3>📖 Instructions</h3>
+          <div class="instructions-text">${escapeHtml(asgn.instructions)}</div>
+        </div>` : ''}
+
+        <!-- Attachment Download -->
+        ${asgn.attachmentName ? `
+        <div class="section-block">
+          <h3>📎 Reference Document</h3>
+          <div style="display:flex;align-items:center;gap:12px;background:var(--gray-50);border-radius:8px;padding:16px;">
+            <span style="font-size:2rem;">${getFileIcon(asgn.attachmentName)}</span>
+            <div style="flex:1;">
+              <div style="font-weight:600;">${escapeHtml(asgn.attachmentName)}</div>
+              <div style="font-size:.8rem;color:var(--gray-500);">Assignment reference document</div>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="downloadFile('${escapeHtml(asgn.attachmentKey)}','${escapeHtml(asgn.attachmentName)}')">
+              ⬇️ Download
+            </button>
+          </div>
+        </div>` : ''}
+
+        <!-- Faculty submissions view -->
+        ${user.role === 'faculty' ? facultySubmissionsBlock() : ''}
+
+        <!-- Faculty action buttons -->
+        ${user.role === 'faculty' ? `
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:var(--space-5);">
+          <a href="create-assignment.html?edit=${asgn.assignmentId}" class="btn btn-outline">✏️ Edit Assignment</a>
+          <button class="btn btn-danger" onclick="deleteAssignment('${asgn.assignmentId}','${escapeHtml(asgn.title)}')">🗑️ Delete Assignment</button>
+        </div>` : ''}
+      `;
+
+      document.getElementById('page-content').innerHTML = html;
+    }
+
+    async function downloadFile(key, name) {
+      showLoading('Generating download link…');
+      try {
+        const res = await API.Files.getDownloadUrl(key, name);
+        hideLoading();
+        if (res.downloadUrl) {
+          const a = document.createElement('a');
+          a.href = res.downloadUrl;
+          a.download = res.fileName || name || 'assignment-attachment.pdf';
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          showToast(`Downloaded ${res.fileName || name}`, 'success');
+        }
+      } catch (err) {
+        hideLoading();
+        showToast(err.message, 'danger');
+      }
+    }
+
+    function showGradeModal(submissionId, studentName, currentGrade, currentFeedback) {
+      const grade = prompt(`Grade for ${studentName} (out of marks):`, currentGrade || '');
+      if (grade === null) return;
+      const gradeNum = parseInt(grade);
+      if (isNaN(gradeNum) || gradeNum < 0) { showToast('Enter a valid grade.', 'warning'); return; }
+      const feedback = prompt('Feedback (optional):', currentFeedback || '');
+      if (feedback === null) return;
+
+      API.Submissions.addGrade(submissionId, { grade: gradeNum, feedback }).then(res => {
+        if (res.success) {
+          showToast('Grade saved!', 'success');
+          loadDetail(assignmentId);
+        } else {
+          showToast(res.message || 'Failed to save grade.', 'danger');
+        }
+      });
+    }
+
+    async function deleteAssignment(id, title) {
+      if (!confirm(`Delete "${title}"?`)) return;
+      const res = await API.Assignments.delete(id);
+      if (res.success) { showToast('Deleted.', 'success'); setTimeout(() => window.location.href = 'faculty-dashboard.html', 1000); }
+      else showToast(res.message, 'danger');
+    }
+  </script>
+</body>
+</html>
