@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Faculty Dashboard — EduCloud</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/design-system.css" />
+  <style>
+    .welcome-banner {
+      background: linear-gradient(135deg, #78350f 0%, #b45309 50%, #f59e0b 100%);
+      border-radius: var(--radius-xl);
+      padding: var(--space-8);
+      color: #fff;
+      position: relative; overflow: hidden;
+      margin-bottom: var(--space-6);
+    }
+    .welcome-banner::after { content: '👩‍🏫'; position: absolute; right: 30px; top: 50%; transform: translateY(-50%); font-size: 5rem; opacity: .15; }
+    .welcome-banner h2 { font-size: 1.5rem; font-weight: 800; margin-bottom: 4px; }
+    .welcome-banner p  { color: rgba(255,255,255,.8); font-size: 14px; }
+    .asgn-row-card {
+      background: var(--bg-card);
+      border: 1px solid var(--gray-200);
+      border-radius: var(--radius-lg);
+      padding: var(--space-4) var(--space-5);
+      display: flex; align-items: center; gap: var(--space-4);
+      flex-wrap: wrap;
+      transition: all var(--transition-fast);
+    }
+    .asgn-row-card:hover { box-shadow: var(--shadow-md); border-color: var(--primary); }
+    .asgn-row-info { flex: 1; min-width: 200px; }
+    .asgn-row-title { font-weight: 700; font-size: .9375rem; margin-bottom: 4px; }
+    .asgn-row-meta  { font-size: .8125rem; color: var(--gray-500); display: flex; gap: 16px; flex-wrap: wrap; }
+    .asgn-row-actions { display: flex; gap: 8px; }
+    .progress-wrap { min-width: 100px; text-align: center; }
+    .progress-wrap .progress-bar { margin-top: 4px; }
+    .progress-count { font-size: .75rem; color: var(--gray-500); }
+    .chart-bar-container { display: flex; align-items: flex-end; gap: 6px; height: 80px; }
+    .chart-bar-col { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 1; }
+    .chart-bar { width: 100%; border-radius: 4px 4px 0 0; min-height: 4px; transition: height .5s ease; }
+    .chart-bar-label { font-size: 10px; color: var(--gray-500); }
+    .chart-bar-val   { font-size: 10px; font-weight: 700; color: var(--gray-700); }
+  </style>
+</head>
+<body>
+  <div id="toast-container"></div>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <div class="app-layout">
+    <!-- ── SIDEBAR ── -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-logo">
+        <div class="sidebar-logo-icon">🎓</div>
+        <div>
+          <div class="sidebar-logo-text">EduCloud</div>
+          <div class="sidebar-logo-sub">Faculty Portal</div>
+        </div>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="nav-section"><span class="nav-section-label">Main</span></div>
+        <a class="nav-item active" data-page="dashboard" href="faculty-dashboard.html">
+          <span class="nav-icon">🏠</span> Dashboard
+        </a>
+        <a class="nav-item" data-page="assignments" href="faculty-assignments.html">
+          <span class="nav-icon">📚</span> My Assignments
+        </a>
+        <a class="nav-item" data-page="create" href="create-assignment.html">
+          <span class="nav-icon">➕</span> Create Assignment
+        </a>
+        <a class="nav-item" data-page="submissions" href="faculty-submissions.html">
+          <span class="nav-icon">📥</span> Submissions
+        </a>
+        <div class="nav-section"><span class="nav-section-label">Account</span></div>
+        <a class="nav-item" data-page="profile" href="profile.html">
+          <span class="nav-icon">👤</span> Profile
+        </a>
+        <a class="nav-item" onclick="logout()">
+          <span class="nav-icon">🚪</span> Sign Out
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="user-widget">
+          <div class="user-avatar" id="sidebar-avatar">FC</div>
+          <div>
+            <div class="user-name" id="sidebar-name">Loading…</div>
+            <div class="user-role">Faculty</div>
+          </div>
+          <button class="user-logout" onclick="logout()" title="Sign out">🚪</button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ── MAIN ── -->
+    <main class="main-content">
+      <header class="topbar">
+        <button class="menu-toggle btn btn-ghost btn-icon" id="menu-toggle">☰</button>
+        <h1 class="topbar-title">Faculty Dashboard</h1>
+        <div class="topbar-actions">
+          <a href="create-assignment.html" class="btn btn-primary btn-sm">➕ New Assignment</a>
+          <button class="notif-btn">🔔</button>
+        </div>
+      </header>
+
+      <div class="page-content" id="page-content">
+        <div class="spinner"></div>
+      </div>
+    </main>
+  </div>
+
+  <script src="../js/config.js"></script>
+  <script src="../js/mock-db.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/utils.js"></script>
+  <script>
+    const user = API.requireRole('faculty', '../pages/login.html');
+    if (!user) throw new Error('Not authenticated');
+
+    showMockBanner();
+    initSidebar();
+
+    document.getElementById('sidebar-name').textContent = user.name;
+    document.getElementById('sidebar-avatar').textContent = getInitials(user.name);
+
+    document.getElementById('menu-toggle').addEventListener('click', () => {
+      document.getElementById('sidebar').classList.toggle('mobile-open');
+      document.getElementById('sidebar-overlay').classList.toggle('active');
+    });
+    document.getElementById('sidebar-overlay').addEventListener('click', () => {
+      document.getElementById('sidebar').classList.remove('mobile-open');
+      document.getElementById('sidebar-overlay').classList.remove('active');
+    });
+
+    async function loadDashboard() {
+      try {
+        const [asgnRes, subRes, statsRes] = await Promise.all([
+          API.Assignments.getByFaculty(user.userId),
+          API.Submissions.getByFaculty(user.userId),
+          API.Stats.forFaculty(user.userId),
+        ]);
+
+        renderDashboard(asgnRes.assignments || [], subRes.submissions || [], statsRes);
+      } catch (err) {
+        document.getElementById('page-content').innerHTML = `<div class="alert alert-danger"><span class="alert-icon">❌</span> ${escapeHtml(err.message)}</div>`;
+      }
+    }
+
+    function renderDashboard(assignments, submissions, stats) {
+      const now = new Date();
+      const activeAsgns = assignments.filter(a => new Date(a.deadline) >= now);
+      const closedAsgns = assignments.filter(a => new Date(a.deadline) < now);
+
+      // Recent submissions (last 5)
+      const recentSubs = [...submissions].sort((a,b) => new Date(b.submittedAt) - new Date(a.submittedAt)).slice(0, 5);
+
+      // Build per-assignment submission count for chart
+      const submissionCount = {};
+      submissions.forEach(s => { submissionCount[s.assignmentId] = (submissionCount[s.assignmentId] || 0) + 1; });
+
+      const html = `
+        <div class="welcome-banner">
+          <h2>Good day, ${escapeHtml(user.name.split(' ').slice(-1)[0])}! 📋</h2>
+          <p>You have <strong>${assignments.length} assignments</strong> and <strong>${stats.pendingGrading || 0} submissions to grade</strong>.</p>
+        </div>
+
+        <!-- Stats -->
+        <div class="grid grid-cols-4 gap-4" style="margin-bottom:var(--space-6);">
+          <div class="stat-card">
+            <div class="stat-icon amber">📋</div>
+            <div>
+              <div class="stat-value">${stats.totalAssignments || 0}</div>
+              <div class="stat-label">Total Assignments</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon green">📥</div>
+            <div>
+              <div class="stat-value">${stats.totalSubmissions || 0}</div>
+              <div class="stat-label">Submissions Received</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon cyan">👥</div>
+            <div>
+              <div class="stat-value">${stats.totalStudents || 0}</div>
+              <div class="stat-label">Total Students</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon red">⏳</div>
+            <div>
+              <div class="stat-value">${stats.pendingGrading || 0}</div>
+              <div class="stat-label">Pending Grading</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Two-column layout -->
+        <div class="grid grid-cols-2 gap-6" style="margin-bottom:var(--space-6);">
+          <!-- Active Assignments -->
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">⚡ Active Assignments (${activeAsgns.length})</span>
+              <a href="faculty-assignments.html" class="btn btn-ghost btn-sm">View All →</a>
+            </div>
+            ${activeAsgns.length === 0 ? '<div class="empty-state" style="padding:30px;"><div class="empty-state-icon">📭</div><p>No active assignments.</p></div>' :
+              activeAsgns.slice(0, 4).map(a => {
+                const subCount = submissionCount[a.assignmentId] || 0;
+                const cd = deadlineCountdown(a.deadline);
+                return `
+                <div style="padding:12px 0;border-bottom:1px solid var(--gray-100);">
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                    <div style="font-weight:600;font-size:.9rem;">${escapeHtml(a.title)}</div>
+                    <span class="badge ${cd.class === 'deadline-danger' ? 'badge-danger' : 'badge-info'}">${cd.text}</span>
+                  </div>
+                  <div style="font-size:.8rem;color:var(--gray-500);margin-top:4px;">${subCount} submissions · Due ${formatDate(a.deadline)}</div>
+                </div>`;
+              }).join('')
+            }
+          </div>
+
+          <!-- Recent Submissions -->
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">📥 Recent Submissions</span>
+              <a href="faculty-submissions.html" class="btn btn-ghost btn-sm">View All →</a>
+            </div>
+            ${recentSubs.length === 0 ? '<div class="empty-state" style="padding:30px;"><div class="empty-state-icon">📭</div><p>No submissions yet.</p></div>' :
+              recentSubs.map(s => {
+                const asgn = assignments.find(a => a.assignmentId === s.assignmentId);
+                return `
+                <div style="padding:12px 0;border-bottom:1px solid var(--gray-100);display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                  <div>
+                    <div style="font-weight:600;font-size:.875rem;">${escapeHtml(s.studentName)}</div>
+                    <div style="font-size:.75rem;color:var(--gray-500);">${asgn ? escapeHtml(asgn.title) : 'Assignment'} · ${timeAgo(s.submittedAt)}</div>
+                  </div>
+                  ${s.isLate ? '<span class="badge badge-warning">Late</span>' : '<span class="badge badge-success">On Time</span>'}
+                </div>`;
+              }).join('')
+            }
+          </div>
+        </div>
+
+        <!-- All Assignments Table -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">📚 All My Assignments</span>
+            <a href="create-assignment.html" class="btn btn-primary btn-sm">➕ Create New</a>
+          </div>
+          ${assignments.length === 0 ?
+            `<div class="empty-state"><div class="empty-state-icon">📭</div><h3>No assignments yet</h3><p>Create your first assignment to get started.</p><a href="create-assignment.html" class="btn btn-primary mt-4" style="margin-top:16px;">Create Assignment</a></div>` :
+            `<div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Assignment</th>
+                    <th>Deadline</th>
+                    <th>Status</th>
+                    <th>Submissions</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${assignments.map(a => {
+                    const subCount = submissionCount[a.assignmentId] || 0;
+                    const cd = deadlineCountdown(a.deadline);
+                    return `
+                    <tr>
+                      <td>
+                        <div style="font-weight:600;">${escapeHtml(a.title)}</div>
+                        <div style="font-size:.75rem;color:var(--gray-500);">${a.totalMarks} marks</div>
+                      </td>
+                      <td>
+                        <div>${formatDate(a.deadline)}</div>
+                        <div class="${cd.class}" style="font-size:.75rem;">${cd.text}</div>
+                      </td>
+                      <td>${assignmentStatusBadge(a.status, a.deadline)}</td>
+                      <td>
+                        <span class="badge badge-info">${subCount} submitted</span>
+                      </td>
+                      <td>
+                        <div class="table-actions">
+                          <a href="assignment-detail.html?id=${a.assignmentId}" class="btn btn-ghost btn-sm">View</a>
+                          <a href="faculty-submissions.html?assignmentId=${a.assignmentId}" class="btn btn-outline btn-sm">📥 Subs</a>
+                          <a href="create-assignment.html?edit=${a.assignmentId}" class="btn btn-ghost btn-sm">✏️</a>
+                          <button class="btn btn-danger btn-sm" onclick="deleteAssignment('${a.assignmentId}', '${escapeHtml(a.title)}')">🗑️</button>
+                        </div>
+                      </td>
+                    </tr>`;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>`
+          }
+        </div>
+      `;
+
+      document.getElementById('page-content').innerHTML = html;
+    }
+
+    async function deleteAssignment(id, title) {
+      if (!confirm(`Delete assignment "${title}"? This cannot be undone.`)) return;
+      showLoading('Deleting…');
+      try {
+        const res = await API.Assignments.delete(id);
+        hideLoading();
+        if (res.success) {
+          showToast('Assignment deleted.', 'success');
+          loadDashboard();
+        } else {
+          showToast(res.message || 'Failed to delete.', 'danger');
+        }
+      } catch (err) {
+        hideLoading();
+        showToast(err.message, 'danger');
+      }
+    }
+
+    loadDashboard();
+  </script>
+</body>
+</html>
