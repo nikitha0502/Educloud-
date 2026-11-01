@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Submission History — EduCloud</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/design-system.css" />
+  <style>
+    .sub-card {
+      background: var(--bg-card); border: 1px solid var(--gray-200); border-radius: var(--radius-lg);
+      padding: var(--space-5); transition: all var(--transition-fast);
+    }
+    .sub-card:hover { box-shadow: var(--shadow-md); }
+    .sub-card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: var(--space-3); }
+    .sub-card-title  { font-weight: 700; font-size: 1rem; color: var(--gray-900); margin-bottom: 2px; }
+    .sub-card-meta   { display: flex; flex-wrap: wrap; gap: 12px; font-size: .8125rem; color: var(--gray-500); }
+    .grade-badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: var(--radius-full); font-weight: 700; font-size: .875rem; }
+    .grade-badge.graded   { background: #d1fae5; color: #065f46; }
+    .grade-badge.ungraded { background: #f3f4f6; color: #6b7280; }
+  </style>
+</head>
+<body>
+  <div id="toast-container"></div>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <div class="app-layout">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-logo">
+        <div class="sidebar-logo-icon">🎓</div>
+        <div><div class="sidebar-logo-text">EduCloud</div><div class="sidebar-logo-sub">Student Portal</div></div>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="nav-section"><span class="nav-section-label">Main</span></div>
+        <a class="nav-item" href="student-dashboard.html"><span class="nav-icon">🏠</span> Dashboard</a>
+        <a class="nav-item" href="assignments.html"><span class="nav-icon">📚</span> Assignments</a>
+        <a class="nav-item" href="upload-submission.html"><span class="nav-icon">📤</span> Submit Work</a>
+        <a class="nav-item active" href="submission-history.html"><span class="nav-icon">📋</span> My Submissions</a>
+        <div class="nav-section"><span class="nav-section-label">Account</span></div>
+        <a class="nav-item" href="profile.html"><span class="nav-icon">👤</span> Profile</a>
+        <a class="nav-item" onclick="logout()"><span class="nav-icon">🚪</span> Sign Out</a>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="user-widget">
+          <div class="user-avatar" id="sidebar-avatar">ST</div>
+          <div><div class="user-name" id="sidebar-name">Student</div><div class="user-role">Student</div></div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar">
+        <button class="menu-toggle btn btn-ghost btn-icon" id="menu-toggle">☰</button>
+        <h1 class="topbar-title">Submission History</h1>
+        <div class="topbar-actions">
+          <a href="upload-submission.html" class="btn btn-primary btn-sm">📤 New Submission</a>
+        </div>
+      </header>
+
+      <div class="page-content" id="page-content">
+        <div class="spinner"></div>
+      </div>
+    </main>
+  </div>
+
+  <script src="../js/config.js"></script>
+  <script src="../js/mock-db.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/utils.js"></script>
+  <script>
+    const user = API.requireRole('student', 'login.html');
+    if (!user) throw new Error();
+
+    showMockBanner();
+    document.getElementById('sidebar-name').textContent = user.name;
+    document.getElementById('sidebar-avatar').textContent = getInitials(user.name);
+
+    document.getElementById('menu-toggle').addEventListener('click', () => {
+      document.getElementById('sidebar').classList.toggle('mobile-open');
+      document.getElementById('sidebar-overlay').classList.toggle('active');
+    });
+
+    async function loadHistory() {
+      try {
+        const [subRes, asgnRes] = await Promise.all([
+          API.Submissions.getByStudent(user.userId),
+          API.Assignments.getAll(),
+        ]);
+
+        const submissions = (subRes.submissions || []).sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt));
+        const assignments = asgnRes.assignments || [];
+
+        renderHistory(submissions, assignments);
+      } catch (err) {
+        document.getElementById('page-content').innerHTML = `<div class="alert alert-danger"><span>❌</span> ${escapeHtml(err.message)}</div>`;
+      }
+    }
+
+    function renderHistory(submissions, assignments) {
+      const graded = submissions.filter(s => s.grade !== null).length;
+      const onTime = submissions.filter(s => !s.isLate).length;
+
+      const html = `
+        <!-- Stats -->
+        <div class="grid grid-cols-4 gap-4" style="margin-bottom:var(--space-6);">
+          <div class="stat-card"><div class="stat-icon purple">📋</div><div><div class="stat-value">${submissions.length}</div><div class="stat-label">Total Submissions</div></div></div>
+          <div class="stat-card"><div class="stat-icon green">✅</div><div><div class="stat-value">${onTime}</div><div class="stat-label">On Time</div></div></div>
+          <div class="stat-card"><div class="stat-icon amber">⚠️</div><div><div class="stat-value">${submissions.length - onTime}</div><div class="stat-label">Late</div></div></div>
+          <div class="stat-card"><div class="stat-icon cyan">🏆</div><div><div class="stat-value">${graded}</div><div class="stat-label">Graded</div></div></div>
+        </div>
+
+        <!-- Filter -->
+        <div class="filter-bar" style="margin-bottom:var(--space-4);">
+          <div class="filter-search">
+            <span class="search-icon">🔍</span>
+            <input type="text" placeholder="Search submissions…" id="search-input" />
+          </div>
+          <select class="form-control" id="filter-status" style="max-width:150px;">
+            <option value="all">All</option>
+            <option value="ontime">On Time</option>
+            <option value="late">Late</option>
+            <option value="graded">Graded</option>
+            <option value="ungraded">Ungraded</option>
+          </select>
+        </div>
+
+        ${submissions.length === 0 ?
+          `<div class="empty-state">
+            <div class="empty-state-icon">📭</div>
+            <h3>No submissions yet</h3>
+            <p>Start by submitting an assignment.</p>
+            <a href="upload-submission.html" class="btn btn-primary" style="margin-top:16px;">📤 Submit Now</a>
+          </div>` :
+          `<div id="submissions-list" class="grid gap-4"></div>
+          <div id="pagination-container"></div>`
+        }
+      `;
+
+      document.getElementById('page-content').innerHTML = html;
+
+      if (submissions.length === 0) return;
+
+      let page = 1;
+      let query = '';
+      let statusFilter = 'all';
+
+      function render() {
+        let filtered = submissions.filter(s => {
+          const asgn = assignments.find(a => a.assignmentId === s.assignmentId);
+          const title = asgn ? asgn.title : '';
+          if (query && !title.toLowerCase().includes(query.toLowerCase()) && !s.fileName.toLowerCase().includes(query.toLowerCase())) return false;
+          if (statusFilter === 'ontime' && s.isLate) return false;
+          if (statusFilter === 'late' && !s.isLate) return false;
+          if (statusFilter === 'graded' && s.grade === null) return false;
+          if (statusFilter === 'ungraded' && s.grade !== null) return false;
+          return true;
+        });
+
+        const pg = paginate(filtered, page, APP_CONFIG.PAGE_SIZE);
+
+        if (pg.items.length === 0) {
+          document.getElementById('submissions-list').innerHTML = `<div class="empty-state"><div class="empty-state-icon">🔍</div><h3>No results</h3><p>Try adjusting filters.</p></div>`;
+          document.getElementById('pagination-container').innerHTML = '';
+          return;
+        }
+
+        document.getElementById('submissions-list').innerHTML = pg.items.map(s => {
+          const asgn = assignments.find(a => a.assignmentId === s.assignmentId);
+          const asgnTitle = asgn ? asgn.title : 'Unknown Assignment';
+          const maxMarks = asgn ? asgn.totalMarks : '—';
+
+          return `
+          <div class="sub-card">
+            <div class="sub-card-header">
+              <div>
+                <div class="sub-card-title">${escapeHtml(asgnTitle)}</div>
+                <div style="font-size:.8125rem;color:var(--gray-500);">by ${escapeHtml(asgn?.facultyName || 'Faculty')}</div>
+              </div>
+              <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+                ${s.isLate ? '<span class="badge badge-warning">Late</span>' : '<span class="badge badge-success">On Time</span>'}
+                <div class="grade-badge ${s.grade !== null ? 'graded' : 'ungraded'}">
+                  ${s.grade !== null ? `🏆 ${s.grade}/${maxMarks}` : '⏳ Awaiting Grade'}
+                </div>
+              </div>
+            </div>
+            <div class="sub-card-meta">
+              <span>${getFileIcon(s.fileName)} ${escapeHtml(s.fileName || 'File')}</span>
+              <span>📦 ${formatFileSize(s.fileSize)}</span>
+              <span>📅 Submitted: ${formatDateTime(s.submittedAt)}</span>
+              ${asgn ? `<span>⏰ Deadline was: ${formatDateTime(asgn.deadline)}</span>` : ''}
+            </div>
+            ${s.feedback ? `<div style="margin-top:10px;padding:10px 12px;background:var(--gray-50);border-radius:8px;font-size:.875rem;color:var(--gray-700);border-left:3px solid var(--primary);"><strong>Feedback:</strong> ${escapeHtml(s.feedback)}</div>` : ''}
+            <div class="asgn-actions" style="margin-top:12px;">
+              <a href="assignment-detail.html?id=${s.assignmentId}" class="btn btn-ghost btn-sm">View Assignment</a>
+              <button class="btn btn-outline btn-sm" onclick="downloadSubmission('${escapeHtml(s.fileKey)}','${escapeHtml(s.fileName)}')">⬇️ Download My File</button>
+              ${asgn && (!isDeadlinePassed(asgn.deadline) || asgn.allowLate) ? `<a href="upload-submission.html?assignmentId=${s.assignmentId}" class="btn btn-ghost btn-sm">🔄 Resubmit</a>` : ''}
+            </div>
+          </div>`;
+        }).join('');
+
+        renderPagination('pagination-container', pg, p => { page = p; render(); });
+      }
+
+      document.getElementById('search-input').addEventListener('input', debounce(e => { query = e.target.value; page = 1; render(); }, 300));
+      document.getElementById('filter-status').addEventListener('change', e => { statusFilter = e.target.value; page = 1; render(); });
+
+      render();
+    }
+
+    async function downloadSubmission(fileKey, fileName) {
+      showLoading('Preparing download…');
+      try {
+        const res = await API.Files.getDownloadUrl(fileKey, fileName);
+        hideLoading();
+        if (res.downloadUrl) {
+          const a = document.createElement('a');
+          a.href = res.downloadUrl;
+          a.download = res.fileName || fileName || 'my-submission.pdf';
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          showToast(`Downloaded ${res.fileName || fileName}`, 'success');
+        }
+      } catch (err) {
+        hideLoading();
+        showToast(err.message, 'danger');
+      }
+    }
+
+    loadHistory();
+  </script>
+</body>
+</html>
