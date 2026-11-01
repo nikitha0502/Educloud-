@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Profile — EduCloud</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/design-system.css" />
+  <style>
+    .profile-hero {
+      background: linear-gradient(135deg, #1e1b4b, #4f46e5);
+      border-radius: var(--radius-xl);
+      padding: var(--space-8);
+      display: flex; align-items: center; gap: var(--space-6);
+      color: #fff;
+      margin-bottom: var(--space-6);
+      flex-wrap: wrap;
+    }
+    .profile-avatar-lg {
+      width: 80px; height: 80px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--primary-light), var(--secondary));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 2rem; font-weight: 800; color: #fff;
+      border: 4px solid rgba(255,255,255,.3);
+      flex-shrink: 0;
+    }
+    .profile-info h2 { font-size: 1.5rem; font-weight: 800; margin-bottom: 4px; }
+    .profile-info p  { color: rgba(255,255,255,.7); font-size: .875rem; }
+    .profile-role-badge {
+      background: rgba(255,255,255,.15);
+      color: #fff;
+      padding: 4px 14px;
+      border-radius: 999px;
+      font-size: .8125rem;
+      font-weight: 700;
+      display: inline-block;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div id="toast-container"></div>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <!-- Change Password Modal -->
+  <div class="modal-backdrop" id="change-pwd-modal">
+    <div class="modal" style="max-width:420px;">
+      <div class="modal-header">
+        <h3 class="modal-title">🔒 Change Password</h3>
+        <button class="modal-close" onclick="closeModal('change-pwd-modal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label" for="cp-current">Current Password <span class="required">*</span></label>
+          <input type="password" id="cp-current" class="form-control" placeholder="Enter current password" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="cp-new">New Password <span class="required">*</span></label>
+          <input type="password" id="cp-new" class="form-control" placeholder="At least 8 characters" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="cp-confirm">Confirm New Password <span class="required">*</span></label>
+          <input type="password" id="cp-confirm" class="form-control" placeholder="Repeat new password" />
+        </div>
+        <div id="cp-msg" class="alert" style="display:none;margin-top:10px;"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('change-pwd-modal')">Cancel</button>
+        <button class="btn btn-primary" id="save-cp-btn" onclick="submitChangePassword()">Update Password</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="app-layout">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-logo">
+        <div class="sidebar-logo-icon">🎓</div>
+        <div><div class="sidebar-logo-text">EduCloud</div><div class="sidebar-logo-sub" id="portal-label">Portal</div></div>
+      </div>
+      <nav class="sidebar-nav" id="sidebar-nav"></nav>
+      <div class="sidebar-footer">
+        <div class="user-widget">
+          <div class="user-avatar" id="sidebar-avatar">U</div>
+          <div><div class="user-name" id="sidebar-name">Loading…</div><div class="user-role" id="sidebar-role">User</div></div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar">
+        <button class="menu-toggle btn btn-ghost btn-icon" id="menu-toggle">☰</button>
+        <h1 class="topbar-title">My Profile</h1>
+        <div class="topbar-actions">
+          <button class="btn btn-ghost btn-sm" onclick="history.back()">← Back</button>
+        </div>
+      </header>
+
+      <div class="page-content" id="page-content">
+        <div class="spinner"></div>
+      </div>
+    </main>
+  </div>
+
+  <script src="../js/config.js"></script>
+  <script src="../js/mock-db.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/utils.js"></script>
+  <script>
+    const user = API.requireAuth('login.html');
+    if (!user) throw new Error();
+
+    showMockBanner();
+    document.getElementById('sidebar-name').textContent = user.name;
+    document.getElementById('sidebar-avatar').textContent = getInitials(user.name);
+    document.getElementById('sidebar-role').textContent = user.role === 'faculty' ? 'Faculty' : 'Student';
+    document.getElementById('portal-label').textContent = user.role === 'faculty' ? 'Faculty Portal' : 'Student Portal';
+
+    const navLinks = user.role === 'faculty' ? `
+      <a class="nav-item" href="faculty-dashboard.html"><span class="nav-icon">🏠</span> Dashboard</a>
+      <a class="nav-item" href="faculty-assignments.html"><span class="nav-icon">📚</span> My Assignments</a>
+      <a class="nav-item" href="create-assignment.html"><span class="nav-icon">➕</span> Create Assignment</a>
+      <a class="nav-item" href="faculty-submissions.html"><span class="nav-icon">📥</span> Submissions</a>
+      <a class="nav-item active" href="profile.html"><span class="nav-icon">👤</span> Profile</a>
+      <a class="nav-item" onclick="logout()"><span class="nav-icon">🚪</span> Sign Out</a>
+    ` : `
+      <a class="nav-item" href="student-dashboard.html"><span class="nav-icon">🏠</span> Dashboard</a>
+      <a class="nav-item" href="assignments.html"><span class="nav-icon">📚</span> Assignments</a>
+      <a class="nav-item" href="upload-submission.html"><span class="nav-icon">📤</span> Submit Work</a>
+      <a class="nav-item" href="submission-history.html"><span class="nav-icon">📋</span> My Submissions</a>
+      <a class="nav-item active" href="profile.html"><span class="nav-icon">👤</span> Profile</a>
+      <a class="nav-item" onclick="logout()"><span class="nav-icon">🚪</span> Sign Out</a>
+    `;
+    document.getElementById('sidebar-nav').innerHTML = navLinks;
+
+    document.getElementById('menu-toggle').addEventListener('click', () => {
+      document.getElementById('sidebar').classList.toggle('mobile-open');
+      document.getElementById('sidebar-overlay').classList.toggle('active');
+    });
+
+    async function loadProfile() {
+      const res = await API.Auth.getProfile(user.userId);
+      if (!res.success) { document.getElementById('page-content').innerHTML = '<div class="alert alert-danger">Failed to load profile.</div>'; return; }
+
+      const p = res.user;
+      const roleLabel = p.role === 'faculty' ? '👩‍🏫 Faculty' : '🎒 Student';
+
+      document.getElementById('page-content').innerHTML = `
+        <!-- Profile Hero -->
+        <div class="profile-hero">
+          <div class="profile-avatar-lg">${getInitials(p.name)}</div>
+          <div class="profile-info">
+            <h2>${escapeHtml(p.name)}</h2>
+            <p>${escapeHtml(p.email)}</p>
+            ${p.department ? `<p>${escapeHtml(p.department)}</p>` : ''}
+            ${p.enrollmentId ? `<p>ID: ${escapeHtml(p.enrollmentId)}</p>` : ''}
+            <span class="profile-role-badge">${roleLabel}</span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-6">
+          <!-- Edit Profile -->
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">✏️ Edit Profile</span>
+            </div>
+            <form id="profile-form">
+              <div class="form-group">
+                <label class="form-label" for="p-name">Full Name</label>
+                <input type="text" id="p-name" class="form-control" value="${escapeHtml(p.name)}" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Email Address</label>
+                <input type="email" class="form-control" value="${escapeHtml(p.email)}" disabled />
+                <div class="form-hint">Email cannot be changed.</div>
+              </div>
+              ${p.role === 'faculty' ? `
+              <div class="form-group">
+                <label class="form-label" for="p-dept">Department</label>
+                <input type="text" id="p-dept" class="form-control" value="${escapeHtml(p.department||'')}" />
+              </div>` : `
+              <div class="form-group">
+                <label class="form-label" for="p-enroll">Enrollment ID</label>
+                <input type="text" id="p-enroll" class="form-control" value="${escapeHtml(p.enrollmentId||'')}" />
+              </div>`}
+              <div id="profile-success" class="alert alert-success" style="display:none;"></div>
+              <button type="submit" class="btn btn-primary" id="save-profile-btn">💾 Save Changes</button>
+            </form>
+          </div>
+
+          <!-- Account Info -->
+          <div>
+            <div class="card" style="margin-bottom:20px;">
+              <div class="card-header"><span class="card-title">🔒 Account Security</span></div>
+              <div style="display:flex;flex-direction:column;gap:16px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--gray-100);">
+                  <div>
+                    <div style="font-weight:600;font-size:.9rem;">Password</div>
+                    <div style="font-size:.8rem;color:var(--gray-500);">Last changed: Never</div>
+                  </div>
+                  <button class="btn btn-outline btn-sm" onclick="openChangePwdModal()">Change</button>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;">
+                  <div>
+                    <div style="font-weight:600;font-size:.9rem;">Two-Factor Authentication</div>
+                    <div style="font-size:.8rem;color:var(--gray-500);">Managed by AWS Cognito MFA</div>
+                  </div>
+                  <span class="badge badge-gray">Not Configured</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header"><span class="card-title">📊 Account Details</span></div>
+              <div style="display:flex;flex-direction:column;gap:12px;font-size:.875rem;">
+                <div style="display:flex;justify-content:space-between;"><span style="color:var(--gray-500);">User ID</span><span style="font-family:monospace;font-size:.8rem;">${escapeHtml(p.userId)}</span></div>
+                <div style="display:flex;justify-content:space-between;"><span style="color:var(--gray-500);">Role</span><span>${roleLabel}</span></div>
+                <div style="display:flex;justify-content:space-between;"><span style="color:var(--gray-500);">Member Since</span><span>${formatDate(p.createdAt)}</span></div>
+                ${APP_CONFIG.USE_MOCK ? `<div style="display:flex;justify-content:space-between;"><span style="color:var(--gray-500);">Mode</span><span class="badge badge-purple">🔧 Mock</span></div>` : ''}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Danger Zone -->
+        <div class="card" style="margin-top:24px;border-color:var(--danger);">
+          <div class="card-header">
+            <span class="card-title" style="color:var(--danger);">⚠️ Danger Zone</span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+            <div>
+              <div style="font-weight:600;">Sign Out from All Devices</div>
+              <div style="font-size:.875rem;color:var(--gray-500);">Revoke all active sessions.</div>
+            </div>
+            <button class="btn btn-danger" onclick="logout()">🚪 Sign Out</button>
+          </div>
+        </div>
+      `;
+
+      document.getElementById('profile-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const btn = document.getElementById('save-profile-btn');
+        btn.disabled = true;
+        btn.innerHTML = '<div class="spinner spinner-sm"></div> Saving…';
+
+        const updates = { name: document.getElementById('p-name').value.trim() };
+        if (p.role === 'faculty') updates.department = document.getElementById('p-dept')?.value?.trim();
+        if (p.role === 'student') updates.enrollmentId = document.getElementById('p-enroll')?.value?.trim();
+
+        const res = await API.Auth.updateProfile(user.userId, updates);
+        btn.disabled = false;
+        btn.innerHTML = '💾 Save Changes';
+
+        if (res.success) {
+          // Update session
+          API.setCurrentUser({ ...user, ...updates }, API.getToken(), !!localStorage.getItem(APP_CONFIG.SESSION_KEY));
+          document.getElementById('sidebar-name').textContent = updates.name;
+          document.getElementById('sidebar-avatar').textContent = getInitials(updates.name);
+          const succ = document.getElementById('profile-success');
+          succ.innerHTML = '<span class="alert-icon">✅</span> Profile updated!';
+          succ.style.display = 'flex';
+          setTimeout(() => { succ.style.display = 'none'; }, 3000);
+          showToast('Profile updated!', 'success');
+          loadProfile();
+        } else {
+          showToast(res.message || 'Failed to update.', 'danger');
+        }
+      });
+    }
+
+    function openChangePwdModal() {
+      document.getElementById('cp-current').value = '';
+      document.getElementById('cp-new').value = '';
+      document.getElementById('cp-confirm').value = '';
+      document.getElementById('cp-msg').style.display = 'none';
+      openModal('change-pwd-modal');
+    }
+
+    async function submitChangePassword() {
+      const current = document.getElementById('cp-current').value;
+      const newPwd = document.getElementById('cp-new').value;
+      const confirm = document.getElementById('cp-confirm').value;
+      const msg = document.getElementById('cp-msg');
+      msg.style.display = 'none';
+
+      if (!current) { showToast('Please enter your current password.', 'warning'); return; }
+      if (!newPwd || newPwd.length < 8) { showToast('New password must be at least 8 characters.', 'warning'); return; }
+      if (newPwd !== confirm) { showToast('New passwords do not match.', 'warning'); return; }
+
+      const btn = document.getElementById('save-cp-btn');
+      btn.disabled = true;
+      btn.textContent = 'Updating…';
+
+      try {
+        const res = await API.Auth.changePassword(user.userId, current, newPwd);
+        if (res.success) {
+          msg.className = 'alert alert-success';
+          msg.innerHTML = '✅ ' + escapeHtml(res.message);
+          msg.style.display = 'flex';
+          showToast('Password updated successfully!', 'success');
+          setTimeout(() => closeModal('change-pwd-modal'), 1200);
+        } else {
+          msg.className = 'alert alert-danger';
+          msg.innerHTML = '❌ ' + escapeHtml(res.message);
+          msg.style.display = 'flex';
+        }
+      } catch (err) {
+        msg.className = 'alert alert-danger';
+        msg.innerHTML = '❌ ' + escapeHtml(err.message || 'Password change failed.');
+        msg.style.display = 'flex';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Update Password';
+      }
+    }
+
+    loadProfile();
+  </script>
+</body>
+</html>
