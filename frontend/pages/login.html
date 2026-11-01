@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sign In — EduCloud</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/design-system.css" />
+  <style>
+    body { background: linear-gradient(135deg, #0f0c29, #1e1b4b, #312e81); min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
+    .auth-wrapper { width: 100%; max-width: 440px; }
+    .auth-brand { text-align: center; margin-bottom: 32px; }
+    .auth-brand-icon { width: 56px; height: 56px; border-radius: 16px; background: linear-gradient(135deg, var(--primary-light), var(--primary)); display: flex; align-items: center; justify-content: center; font-size: 26px; margin: 0 auto 12px; }
+    .auth-brand h1 { font-size: 24px; font-weight: 800; color: #fff; }
+    .auth-brand p  { color: rgba(255,255,255,.55); font-size: 14px; margin-top: 4px; }
+    .auth-card { background: #fff; border-radius: 20px; padding: 36px; box-shadow: 0 25px 60px rgba(0,0,0,.35); }
+    .auth-card h2 { font-size: 22px; font-weight: 700; color: var(--gray-900); margin-bottom: 4px; }
+    .auth-card .subtitle { color: var(--gray-500); font-size: 14px; margin-bottom: 28px; }
+    .demo-accounts { background: #eef2ff; border-radius: 10px; padding: 14px 16px; margin-bottom: 24px; }
+    .demo-accounts p { color: var(--primary); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 10px; }
+    .demo-btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .demo-btn { background: var(--primary); color: #fff; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all .15s; }
+    .demo-btn:hover { background: var(--primary-dark); }
+    .demo-btn.secondary { background: var(--secondary); }
+    .auth-footer { text-align: center; margin-top: 20px; font-size: 14px; color: var(--gray-500); }
+    .auth-footer a { color: var(--primary); font-weight: 600; }
+    .role-selector { display: flex; gap: 8px; margin-bottom: 20px; }
+    .role-tab { flex: 1; padding: 10px; border-radius: 8px; border: 1.5px solid var(--gray-200); background: #fff; font-size: 13px; font-weight: 600; color: var(--gray-600); cursor: pointer; transition: all .15s; text-align: center; }
+    .role-tab.active { border-color: var(--primary); background: #eef2ff; color: var(--primary); }
+    .password-wrapper { position: relative; }
+    .password-toggle { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--gray-400); font-size: 18px; }
+  </style>
+</head>
+<body>
+  <div id="toast-container"></div>
+
+  <div class="auth-wrapper">
+    <div class="auth-brand">
+      <div class="auth-brand-icon">🎓</div>
+      <h1>EduCloud</h1>
+      <p>Student Assignment Management System</p>
+    </div>
+
+    <div class="auth-card">
+      <h2>Welcome back 👋</h2>
+      <p class="subtitle">Sign in to your account to continue</p>
+
+      <!-- Demo accounts -->
+      <div class="demo-accounts">
+        <p>🧪 Demo Accounts — Click to auto-fill</p>
+        <div class="demo-btn-row">
+          <button class="demo-btn" onclick="fillDemo('student@demo.com','Student@123')">🎒 Student Demo</button>
+          <button class="demo-btn secondary" onclick="fillDemo('faculty@demo.com','Faculty@123')">👩‍🏫 Faculty Demo</button>
+        </div>
+      </div>
+
+      <form id="login-form" novalidate>
+        <div class="form-group">
+          <label class="form-label" for="email">Email Address <span class="required">*</span></label>
+          <input type="email" id="email" class="form-control" placeholder="you@example.com" autocomplete="email" />
+          <div class="form-error" id="email-error"></div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="password">Password <span class="required">*</span></label>
+          <div class="password-wrapper">
+            <input type="password" id="password" class="form-control" placeholder="Enter your password" autocomplete="current-password" />
+            <button type="button" class="password-toggle" id="toggle-pwd">👁️</button>
+          </div>
+          <div class="form-error" id="password-error"></div>
+        </div>
+
+        <div class="flex justify-between items-center mb-4" style="margin-bottom:20px;">
+          <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--gray-600);cursor:pointer;">
+            <input type="checkbox" id="remember-me" />
+            Remember me
+          </label>
+          <a href="javascript:void(0)" onclick="openForgotPwdModal()" style="font-size:14px;color:var(--primary);font-weight:500;">Forgot password?</a>
+        </div>
+
+        <div id="login-error" class="alert alert-danger" style="display:none;"></div>
+
+        <button type="submit" class="btn btn-primary btn-block btn-lg" id="submit-btn">
+          Sign In
+        </button>
+      </form>
+
+      <div class="auth-footer">
+        Don't have an account?
+        <a href="register-student.html">Register as Student</a> or
+        <a href="register-faculty.html">Register as Faculty</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Forgot Password Modal -->
+  <div class="modal-backdrop" id="forgot-pwd-modal">
+    <div class="modal" style="max-width:400px;">
+      <div class="modal-header">
+        <h3 class="modal-title">🔑 Reset Password</h3>
+        <button class="modal-close" onclick="closeModal('forgot-pwd-modal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:13px;color:var(--gray-600);margin-bottom:16px;">
+          Enter your registered email and choose a new password (min. 8 characters).
+        </p>
+        <div class="form-group">
+          <label class="form-label" for="reset-email">Email Address <span class="required">*</span></label>
+          <input type="email" id="reset-email" class="form-control" placeholder="your@email.com" />
+          <div class="form-error" id="reset-email-error"></div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="reset-pwd">New Password <span class="required">*</span></label>
+          <input type="password" id="reset-pwd" class="form-control" placeholder="At least 8 characters" />
+          <div class="form-error" id="reset-pwd-error"></div>
+        </div>
+        <div id="reset-msg" class="alert" style="display:none;margin-top:10px;"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('forgot-pwd-modal')">Cancel</button>
+        <button class="btn btn-primary" id="confirm-reset-btn" onclick="submitPasswordReset()">Update Password</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/config.js"></script>
+  <script src="../js/mock-db.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/utils.js"></script>
+  <script>
+    // Redirect if already logged in
+    const existingUser = API.getCurrentUser();
+    if (existingUser) {
+      window.location.href = existingUser.role === 'faculty'
+        ? 'faculty-dashboard.html'
+        : 'student-dashboard.html';
+    }
+
+    showMockBanner();
+
+    // Password toggle
+    document.getElementById('toggle-pwd').addEventListener('click', function() {
+      const pwd = document.getElementById('password');
+      if (pwd.type === 'password') { pwd.type = 'text'; this.textContent = '🙈'; }
+      else { pwd.type = 'password'; this.textContent = '👁️'; }
+    });
+
+    // Demo fill
+    function fillDemo(email, password) {
+      document.getElementById('email').value = email;
+      document.getElementById('password').value = password;
+    }
+
+    // Form submit
+    document.getElementById('login-form').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const errorDiv = document.getElementById('login-error');
+      errorDiv.style.display = 'none';
+
+      let valid = true;
+      valid = validateEmail('email', 'email-error') && valid;
+      if (!document.getElementById('password').value) {
+        document.getElementById('password').classList.add('is-invalid');
+        document.getElementById('password-error').textContent = 'Password is required.';
+        document.getElementById('password-error').classList.add('visible');
+        valid = false;
+      } else {
+        document.getElementById('password').classList.remove('is-invalid');
+        document.getElementById('password-error').classList.remove('visible');
+      }
+      if (!valid) return;
+
+      const btn = document.getElementById('submit-btn');
+      btn.disabled = true;
+      btn.innerHTML = '<div class="spinner spinner-sm"></div> Signing in…';
+
+      try {
+        const email = document.getElementById('email').value.trim();
+        const password = document.getElementById('password').value;
+        const remember = document.getElementById('remember-me').checked;
+
+        const res = await API.Auth.login(email, password);
+
+        if (!res.success) {
+          errorDiv.innerHTML = `<span class="alert-icon">❌</span> ${escapeHtml(res.message)}`;
+          errorDiv.style.display = 'flex';
+          return;
+        }
+
+        API.setCurrentUser(res.user, res.token, remember);
+        showToast(`Welcome back, ${res.user.name}! 👋`, 'success');
+
+        setTimeout(() => {
+          if (res.user.role === 'faculty') window.location.href = 'faculty-dashboard.html';
+          else window.location.href = 'student-dashboard.html';
+        }, 800);
+
+      } catch (err) {
+        errorDiv.innerHTML = `<span class="alert-icon">❌</span> ${escapeHtml(err.message || 'Login failed. Please try again.')}`;
+        errorDiv.style.display = 'flex';
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'Sign In';
+      }
+    });
+
+    function openForgotPwdModal() {
+      document.getElementById('reset-email').value = document.getElementById('email').value.trim();
+      document.getElementById('reset-pwd').value = '';
+      document.getElementById('reset-msg').style.display = 'none';
+      openModal('forgot-pwd-modal');
+    }
+
+    async function submitPasswordReset() {
+      const email = document.getElementById('reset-email').value.trim();
+      const pwd = document.getElementById('reset-pwd').value;
+      const msg = document.getElementById('reset-msg');
+      msg.style.display = 'none';
+
+      if (!email) {
+        showToast('Please enter your email.', 'warning');
+        return;
+      }
+      if (!pwd || pwd.length < 8) {
+        showToast('Password must be at least 8 characters.', 'warning');
+        return;
+      }
+
+      const btn = document.getElementById('confirm-reset-btn');
+      btn.disabled = true;
+      btn.textContent = 'Updating…';
+
+      try {
+        const res = await API.Auth.resetPassword(email, pwd);
+        if (res.success) {
+          msg.className = 'alert alert-success';
+          msg.innerHTML = '✅ ' + escapeHtml(res.message);
+          msg.style.display = 'flex';
+          document.getElementById('email').value = email;
+          document.getElementById('password').value = pwd;
+          showToast('Password reset! You can now log in.', 'success');
+          setTimeout(() => closeModal('forgot-pwd-modal'), 1200);
+        } else {
+          msg.className = 'alert alert-danger';
+          msg.innerHTML = '❌ ' + escapeHtml(res.message);
+          msg.style.display = 'flex';
+        }
+      } catch (err) {
+        msg.className = 'alert alert-danger';
+        msg.innerHTML = '❌ ' + escapeHtml(err.message || 'Reset failed.');
+        msg.style.display = 'flex';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Update Password';
+      }
+    }
+  </script>
+</body>
+</html>
