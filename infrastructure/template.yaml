@@ -1,0 +1,561 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: EduCloud - Cloud-Based Student Assignment Management System
+
+# ─── Global settings ──────────────────────────────────────────────────────────
+Globals:
+  Function:
+    Runtime: nodejs18.x
+    Timeout: 30
+    MemorySize: 256
+    Environment:
+      Variables:
+        AWS_REGION: !Ref AWS::Region
+        USERS_TABLE: !Ref UsersTable
+        ASSIGNMENTS_TABLE: !Ref AssignmentsTable
+        SUBMISSIONS_TABLE: !Ref SubmissionsTable
+        S3_BUCKET: !Ref AssignmentsBucket
+        COGNITO_USER_POOL_ID: !Ref CognitoUserPool
+        COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
+        FRONTEND_URL: !Sub 'https://${CloudFrontDistribution.DomainName}'
+        AUTO_CONFIRM: 'false'
+  Api:
+    Cors:
+      AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
+      AllowHeaders: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
+      AllowOrigin: "'*'"
+
+# ─── Parameters ───────────────────────────────────────────────────────────────
+Parameters:
+  Stage:
+    Type: String
+    Default: prod
+    AllowedValues: [dev, prod]
+  AdminEmail:
+    Type: String
+    Description: Admin email for Cognito notifications
+
+# ─── Resources ────────────────────────────────────────────────────────────────
+Resources:
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # COGNITO USER POOL
+  # ────────────────────────────────────────────────────────────────────────────
+  CognitoUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: EduCloud-Users
+      AutoVerifiedAttributes:
+        - email
+      UsernameAttributes:
+        - email
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireUppercase: true
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: false
+      Schema:
+        - Name: email
+          Required: true
+          Mutable: false
+        - Name: name
+          Required: true
+          Mutable: true
+        - Name: role
+          AttributeDataType: String
+          Mutable: false
+        - Name: userId
+          AttributeDataType: String
+          Mutable: false
+      EmailConfiguration:
+        EmailSendingAccount: COGNITO_DEFAULT
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: verified_email
+            Priority: 1
+      UserPoolTags:
+        Project: EduCloud
+        Stage: !Ref Stage
+
+  CognitoUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: EduCloud-WebClient
+      UserPoolId: !Ref CognitoUserPool
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+        - ALLOW_USER_SRP_AUTH
+      PreventUserExistenceErrors: ENABLED
+      AccessTokenValidity: 24
+      IdTokenValidity: 24
+      RefreshTokenValidity: 30
+      TokenValidityUnits:
+        AccessToken: hours
+        IdToken: hours
+        RefreshToken: days
+
+  CognitoStudentsGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: Students
+      UserPoolId: !Ref CognitoUserPool
+      Description: Student users
+
+  CognitoFacultyGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: Faculty
+      UserPoolId: !Ref CognitoUserPool
+      Description: Faculty members
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # DYNAMODB TABLES
+  # ────────────────────────────────────────────────────────────────────────────
+  UsersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: EduCloud-Users
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: email
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: EmailIndex
+          KeySchema:
+            - AttributeName: email
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      Tags:
+        - Key: Project
+          Value: EduCloud
+
+  AssignmentsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: EduCloud-Assignments
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: assignmentId
+          AttributeType: S
+        - AttributeName: facultyId
+          AttributeType: S
+        - AttributeName: createdAt
+          AttributeType: S
+      KeySchema:
+        - AttributeName: assignmentId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: FacultyIndex
+          KeySchema:
+            - AttributeName: facultyId
+              KeyType: HASH
+            - AttributeName: createdAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      Tags:
+        - Key: Project
+          Value: EduCloud
+
+  SubmissionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: EduCloud-Submissions
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: submissionId
+          AttributeType: S
+        - AttributeName: studentId
+          AttributeType: S
+        - AttributeName: assignmentId
+          AttributeType: S
+        - AttributeName: submittedAt
+          AttributeType: S
+      KeySchema:
+        - AttributeName: submissionId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: StudentIndex
+          KeySchema:
+            - AttributeName: studentId
+              KeyType: HASH
+            - AttributeName: submittedAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: AssignmentIndex
+          KeySchema:
+            - AttributeName: assignmentId
+              KeyType: HASH
+            - AttributeName: submittedAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: StudentAssignmentIndex
+          KeySchema:
+            - AttributeName: studentId
+              KeyType: HASH
+            - AttributeName: assignmentId
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      Tags:
+        - Key: Project
+          Value: EduCloud
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # S3 BUCKETS
+  # ────────────────────────────────────────────────────────────────────────────
+  AssignmentsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'educloud-assignments-${AWS::AccountId}-${Stage}'
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders: ['*']
+            AllowedMethods: [GET, PUT, POST, DELETE, HEAD]
+            AllowedOrigins: ['*']
+            ExposedHeaders: [ETag]
+            MaxAge: 3000
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteIncompleteMultipart
+            Status: Enabled
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 1
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      Tags:
+        - Key: Project
+          Value: EduCloud
+
+  FrontendBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'educloud-frontend-${AWS::AccountId}-${Stage}'
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: index.html
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+
+  FrontendBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FrontendBucket
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              CanonicalUser: !GetAtt CloudFrontOAI.S3CanonicalUserId
+            Action: 's3:GetObject'
+            Resource: !Sub '${FrontendBucket.Arn}/*'
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # CLOUDFRONT
+  # ────────────────────────────────────────────────────────────────────────────
+  CloudFrontOAI:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: EduCloud Frontend OAI
+
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        DefaultRootObject: index.html
+        Origins:
+          - Id: S3Origin
+            DomainName: !GetAtt FrontendBucket.RegionalDomainName
+            S3OriginConfig:
+              OriginAccessIdentity: !Sub 'origin-access-identity/cloudfront/${CloudFrontOAI}'
+        DefaultCacheBehavior:
+          ViewerProtocolPolicy: redirect-to-https
+          TargetOriginId: S3Origin
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6  # CachingOptimized
+          Compress: true
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+        HttpVersion: http2
+        PriceClass: PriceClass_100
+        Tags:
+          - Key: Project
+            Value: EduCloud
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # IAM ROLES
+  # ────────────────────────────────────────────────────────────────────────────
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: EduCloud-Lambda-Role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: EduCloudLambdaPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                Resource:
+                  - !GetAtt UsersTable.Arn
+                  - !GetAtt AssignmentsTable.Arn
+                  - !GetAtt SubmissionsTable.Arn
+                  - !Sub '${UsersTable.Arn}/index/*'
+                  - !Sub '${AssignmentsTable.Arn}/index/*'
+                  - !Sub '${SubmissionsTable.Arn}/index/*'
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                Resource: !Sub '${AssignmentsBucket.Arn}/*'
+              - Effect: Allow
+                Action:
+                  - cognito-idp:AdminGetUser
+                  - cognito-idp:AdminAddUserToGroup
+                  - cognito-idp:AdminConfirmSignUp
+                  - cognito-idp:SignUp
+                  - cognito-idp:InitiateAuth
+                Resource: !GetAtt CognitoUserPool.Arn
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # LAMBDA FUNCTIONS
+  # ────────────────────────────────────────────────────────────────────────────
+  RegisterFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: EduCloud-Register
+      CodeUri: ../backend/src/handlers/auth/
+      Handler: register.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Events:
+        Register:
+          Type: Api
+          Properties:
+            Path: /auth/register
+            Method: POST
+
+  LoginFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: EduCloud-Login
+      CodeUri: ../backend/src/handlers/auth/
+      Handler: login.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Events:
+        Login:
+          Type: Api
+          Properties:
+            Path: /auth/login
+            Method: POST
+
+  CreateAssignmentFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: EduCloud-CreateAssignment
+      CodeUri: ../backend/src/handlers/assignments/
+      Handler: create.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Events:
+        Create:
+          Type: Api
+          Properties:
+            Path: /assignments
+            Method: POST
+            Auth:
+              Authorizer: CognitoAuthorizer
+
+  GetAssignmentsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: EduCloud-GetAssignments
+      CodeUri: ../backend/src/handlers/assignments/
+      Handler: get.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Events:
+        GetAll:
+          Type: Api
+          Properties:
+            Path: /assignments
+            Method: GET
+            Auth:
+              Authorizer: CognitoAuthorizer
+        GetOne:
+          Type: Api
+          Properties:
+            Path: /assignments/{id}
+            Method: GET
+            Auth:
+              Authorizer: CognitoAuthorizer
+
+  UpdateAssignmentFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: EduCloud-UpdateAssignment
+      CodeUri: ../backend/src/handlers/assignments/
+      Handler: update.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Events:
+        Update:
+          Type: Api
+          Properties:
+            Path: /assignments/{id}
+            Method: PUT
+            Auth:
+              Authorizer: CognitoAuthorizer
+        Delete:
+          Type: Api
+          Properties:
+            Path: /assignments/{id}
+            Method: DELETE
+            Auth:
+              Authorizer: CognitoAuthorizer
+
+  SubmitFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: EduCloud-Submit
+      CodeUri: ../backend/src/handlers/submissions/
+      Handler: submit.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Events:
+        Submit:
+          Type: Api
+          Properties:
+            Path: /submissions
+            Method: POST
+            Auth:
+              Authorizer: CognitoAuthorizer
+
+  GetSubmissionsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: EduCloud-GetSubmissions
+      CodeUri: ../backend/src/handlers/submissions/
+      Handler: get.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Events:
+        GetAll:
+          Type: Api
+          Properties:
+            Path: /submissions
+            Method: GET
+            Auth:
+              Authorizer: CognitoAuthorizer
+        GetOne:
+          Type: Api
+          Properties:
+            Path: /submissions/{id}
+            Method: GET
+            Auth:
+              Authorizer: CognitoAuthorizer
+        Grade:
+          Type: Api
+          Properties:
+            Path: /submissions/{id}/grade
+            Method: PUT
+            Auth:
+              Authorizer: CognitoAuthorizer
+
+  PresignedUrlFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: EduCloud-PresignedUrl
+      CodeUri: ../backend/src/handlers/files/
+      Handler: presigned.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Events:
+        UploadUrl:
+          Type: Api
+          Properties:
+            Path: /files/upload-url
+            Method: POST
+            Auth:
+              Authorizer: CognitoAuthorizer
+        DownloadUrl:
+          Type: Api
+          Properties:
+            Path: /files/download-url
+            Method: POST
+            Auth:
+              Authorizer: CognitoAuthorizer
+
+# ─── Outputs ──────────────────────────────────────────────────────────────────
+Outputs:
+  ApiGatewayUrl:
+    Description: API Gateway endpoint URL
+    Value: !Sub 'https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/${Stage}'
+    Export:
+      Name: EduCloud-ApiUrl
+
+  CognitoUserPoolId:
+    Description: Cognito User Pool ID
+    Value: !Ref CognitoUserPool
+    Export:
+      Name: EduCloud-UserPoolId
+
+  CognitoClientId:
+    Description: Cognito App Client ID
+    Value: !Ref CognitoUserPoolClient
+    Export:
+      Name: EduCloud-ClientId
+
+  S3BucketName:
+    Description: S3 bucket for assignments
+    Value: !Ref AssignmentsBucket
+
+  CloudFrontUrl:
+    Description: CloudFront distribution URL
+    Value: !Sub 'https://${CloudFrontDistribution.DomainName}'
+    Export:
+      Name: EduCloud-FrontendUrl
