@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Test Runner — EduCloud</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', system-ui, sans-serif; background: #0f0c29; color: #e2e8f0; min-height: 100vh; padding: 40px 20px; }
+    h1 { font-size: 1.5rem; font-weight: 800; margin-bottom: 4px; color: #a5b4fc; }
+    .subtitle { font-size: .875rem; color: rgba(255,255,255,.5); margin-bottom: 32px; }
+    .suite { background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+    .suite-header { font-weight: 700; font-size: .9375rem; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; }
+    .test-case { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,.06); font-size: .8125rem; }
+    .test-case:last-child { border-bottom: none; }
+    .test-icon { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .65rem; font-weight: 800; flex-shrink: 0; margin-top: 1px; }
+    .test-icon.pass { background: #065f46; color: #6ee7b7; }
+    .test-icon.fail { background: #7f1d1d; color: #fca5a5; }
+    .test-icon.skip { background: #374151; color: #9ca3af; }
+    .test-name { flex: 1; }
+    .test-desc { color: rgba(255,255,255,.4); font-size: .75rem; }
+    .test-time { color: rgba(255,255,255,.3); font-size: .7rem; }
+    .suite-badge { display: flex; gap: 8px; }
+    .badge { padding: 3px 10px; border-radius: 999px; font-size: .7rem; font-weight: 700; }
+    .badge.pass { background: #065f46; color: #6ee7b7; }
+    .badge.fail { background: #7f1d1d; color: #fca5a5; }
+    .summary {
+      background: rgba(255,255,255,.05);
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin-bottom: 24px;
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+      gap: 16px; text-align: center;
+    }
+    .summary-val { font-size: 2rem; font-weight: 800; }
+    .summary-lbl { font-size: .7rem; color: rgba(255,255,255,.5); text-transform: uppercase; letter-spacing: .1em; }
+    .btn { padding: 10px 20px; border-radius: 8px; font-size: .875rem; font-weight: 600; border: none; cursor: pointer; transition: all .15s; }
+    .btn-primary { background: #4f46e5; color: #fff; }
+    .btn-primary:hover { background: #3730a3; }
+    .run-bar { display: flex; gap: 12px; align-items: center; margin-bottom: 24px; }
+    .progress { flex: 1; height: 6px; background: rgba(255,255,255,.1); border-radius: 999px; overflow: hidden; }
+    .progress-fill { height: 100%; background: linear-gradient(90deg, #4f46e5, #06b6d4); width: 0%; transition: width .3s; }
+    .log-area { background: rgba(0,0,0,.4); border-radius: 8px; padding: 16px; font-size: .75rem; font-family: monospace; max-height: 200px; overflow-y: auto; color: #4ade80; margin-top: 16px; }
+  </style>
+</head>
+<body>
+  <h1>🧪 EduCloud — Browser Test Suite</h1>
+  <p class="subtitle">Frontend functional tests running against Mock DB · All tests run in browser, no server needed</p>
+
+  <div class="run-bar">
+    <button class="btn btn-primary" id="run-btn" onclick="runAllTests()">▶ Run All Tests</button>
+    <div class="progress"><div class="progress-fill" id="progress-fill"></div></div>
+    <span id="progress-text" style="font-size:.8rem;color:rgba(255,255,255,.5);">0 / 0</span>
+  </div>
+
+  <div class="summary" id="summary">
+    <div><div class="summary-val" id="s-total" style="color:#a5b4fc;">—</div><div class="summary-lbl">Total</div></div>
+    <div><div class="summary-val" id="s-pass"  style="color:#6ee7b7;">—</div><div class="summary-lbl">Passed</div></div>
+    <div><div class="summary-val" id="s-fail"  style="color:#fca5a5;">—</div><div class="summary-lbl">Failed</div></div>
+    <div><div class="summary-val" id="s-time"  style="color:#fde68a;">—</div><div class="summary-lbl">Time (ms)</div></div>
+  </div>
+
+  <div id="suites"></div>
+
+  <div class="log-area" id="log">Ready. Click "Run All Tests" to begin.</div>
+
+  <script src="../js/config.js"></script>
+  <script src="../js/mock-db.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/utils.js"></script>
+  <script>
+
+  // ─── Minimal Test Framework ────────────────────────────────────────────────
+  const TestRunner = (() => {
+    const suites = [];
+    let currentSuite = null;
+
+    function describe(name, fn) {
+      currentSuite = { name, tests: [] };
+      suites.push(currentSuite);
+      fn();
+      currentSuite = null;
+    }
+
+    function it(name, fn) {
+      if (currentSuite) {
+        currentSuite.tests.push({ name, fn });
+      }
+    }
+
+    function expect(val) {
+      return {
+        toBe:          (exp) => { if (val !== exp) throw new Error(`Expected ${JSON.stringify(exp)}, got ${JSON.stringify(val)}`); },
+        toEqual:       (exp) => { if (JSON.stringify(val) !== JSON.stringify(exp)) throw new Error(`Expected ${JSON.stringify(exp)}, got ${JSON.stringify(val)}`); },
+        toBeTruthy:    ()    => { if (!val) throw new Error(`Expected truthy, got ${JSON.stringify(val)}`); },
+        toBeFalsy:     ()    => { if (val)  throw new Error(`Expected falsy, got ${JSON.stringify(val)}`); },
+        toContain:     (str) => { if (!String(val).includes(str)) throw new Error(`Expected "${val}" to contain "${str}"`); },
+        toBeNull:      ()    => { if (val !== null) throw new Error(`Expected null, got ${JSON.stringify(val)}`); },
+        not: {
+          toBe:      (exp) => { if (val === exp) throw new Error(`Expected not ${JSON.stringify(exp)}`); },
+          toBeNull:  ()    => { if (val === null) throw new Error(`Expected not null`); },
+        }
+      };
+    }
+
+    async function run(onProgress) {
+      // Clear mock storage and re-seed
+      localStorage.clear();
+      MockDB.seed();
+
+      const results = { total: 0, pass: 0, fail: 0, suites: [] };
+      const startTime = Date.now();
+
+      for (const suite of suites) {
+        const suiteResult = { name: suite.name, tests: [] };
+        for (const test of suite.tests) {
+          const t0 = Date.now();
+          let status = 'pass', error = null;
+          try { await test.fn(expect); }
+          catch (e) { status = 'fail'; error = e.message; }
+          const elapsed = Date.now() - t0;
+          suiteResult.tests.push({ name: test.name, status, error, elapsed });
+          results.total++;
+          if (status === 'pass') results.pass++; else results.fail++;
+          onProgress && onProgress(results.total);
+        }
+        results.suites.push(suiteResult);
+      }
+      results.elapsed = Date.now() - startTime;
+      return results;
+    }
+
+    return { describe, it, run, suites };
+  })();
+
+  const { describe, it } = TestRunner;
+
+  // ─── TEST SUITES ──────────────────────────────────────────────────────────
+
+  // ── Auth Tests ─────────────────────────────────────────────────────────────
+  describe('🔐 Authentication', () => {
+    it('rejects registration with duplicate email', async (expect) => {
+      const r1 = MockDB.Auth.register({ name:'A', email:'dup@test.com', password:'Test@123', role:'student' });
+      const r2 = MockDB.Auth.register({ name:'B', email:'dup@test.com', password:'Test@123', role:'student' });
+      expect(r1.success).toBe(true);
+      expect(r2.success).toBe(false);
+      expect(r2.message).toContain('already exists');
+    });
+
+    it('rejects short password', async (expect) => {
+      const r = MockDB.Auth.register({ name:'A', email:'a@test.com', password:'123', role:'student' });
+      expect(r.success).toBe(false);
+      expect(r.message).toContain('8 characters');
+    });
+
+    it('registers student successfully', async (expect) => {
+      const r = MockDB.Auth.register({ name:'John Doe', email:'john@test.com', password:'Pass@1234', role:'student', enrollmentId:'CS001' });
+      expect(r.success).toBe(true);
+      expect(r.user.role).toBe('student');
+      expect(r.user.enrollmentId).toBe('CS001');
+    });
+
+    it('registers faculty successfully', async (expect) => {
+      const r = MockDB.Auth.register({ name:'Dr. Smith', email:'smith@test.com', password:'Pass@1234', role:'faculty', department:'CS' });
+      expect(r.success).toBe(true);
+      expect(r.user.role).toBe('faculty');
+    });
+
+    it('logs in with valid credentials', async (expect) => {
+      const r = MockDB.Auth.login({ email:'student@demo.com', password:'Student@123' });
+      expect(r.success).toBe(true);
+      expect(r.user.role).toBe('student');
+      expect(typeof r.token).toBe('string');
+    });
+
+    it('rejects invalid password', async (expect) => {
+      const r = MockDB.Auth.login({ email:'student@demo.com', password:'wrong' });
+      expect(r.success).toBe(false);
+      expect(r.message).toContain('Invalid');
+    });
+
+    it('rejects unknown email', async (expect) => {
+      const r = MockDB.Auth.login({ email:'nobody@test.com', password:'anything' });
+      expect(r.success).toBe(false);
+    });
+
+    it('does not expose password in response', async (expect) => {
+      const r = MockDB.Auth.register({ name:'Safe', email:'safe@test.com', password:'Pass@1234', role:'student' });
+      expect(r.user.password).toBe(undefined);
+    });
+
+    it('resets password with valid email', async (expect) => {
+      const r = MockDB.Auth.resetPassword('student@demo.com', 'NewPassword@123');
+      expect(r.success).toBe(true);
+      const loginTest = MockDB.Auth.login({ email: 'student@demo.com', password: 'NewPassword@123' });
+      expect(loginTest.success).toBe(true);
+    });
+
+    it('rejects password reset with unknown email', async (expect) => {
+      const r = MockDB.Auth.resetPassword('unknown@test.com', 'NewPassword@123');
+      expect(r.success).toBe(false);
+      expect(r.message).toContain('No account found');
+    });
+
+    it('changes password when current password is correct', async (expect) => {
+      const r = MockDB.Auth.changePassword('faculty-001', 'Faculty@123', 'FacultyNew@123');
+      expect(r.success).toBe(true);
+      const loginTest = MockDB.Auth.login({ email: 'faculty@demo.com', password: 'FacultyNew@123' });
+      expect(loginTest.success).toBe(true);
+    });
+
+    it('rejects password change when current password is wrong', async (expect) => {
+      const r = MockDB.Auth.changePassword('faculty-001', 'WrongPassword', 'FacultyNew@123');
+      expect(r.success).toBe(false);
+      expect(r.message).toContain('incorrect');
+    });
+  });
+
+  // ── Assignment Tests ───────────────────────────────────────────────────────
+  describe('📋 Assignment Management', () => {
+    const futureDate = new Date(Date.now() + 7 * 86400000).toISOString();
+    const pastDate   = new Date(Date.now() - 5 * 86400000).toISOString();
+
+    it('creates assignment successfully', async (expect) => {
+      const r = MockDB.Assignments.create({
+        title: 'Test Assignment',
+        description: 'Test description',
+        instructions: 'Do it well',
+        facultyId: 'faculty-001',
+        facultyName: 'Dr. Johnson',
+        deadline: futureDate,
+        totalMarks: 100,
+        allowLate: false,
+      });
+      expect(r.success).toBe(true);
+      expect(r.assignment.title).toBe('Test Assignment');
+      expect(r.assignment.facultyId).toBe('faculty-001');
+    });
+
+    it('retrieves all assignments', async (expect) => {
+      const r = MockDB.Assignments.getAll();
+      expect(r.success).toBe(true);
+      expect(Array.isArray(r.assignments)).toBeTruthy();
+    });
+
+    it('retrieves assignment by ID', async (expect) => {
+      const r = MockDB.Assignments.getById('asgn-001');
+      expect(r.success).toBe(true);
+      expect(r.assignment.assignmentId).toBe('asgn-001');
+    });
+
+    it('returns error for non-existent assignment', async (expect) => {
+      const r = MockDB.Assignments.getById('nonexistent');
+      expect(r.success).toBe(false);
+      expect(r.message).toContain('not found');
+    });
+
+    it('filters assignments by faculty', async (expect) => {
+      const r = MockDB.Assignments.getByFaculty('faculty-001');
+      expect(r.success).toBe(true);
+      r.assignments.forEach(a => expect(a.facultyId).toBe('faculty-001'));
+    });
+
+    it('blocks unauthorized update (wrong faculty)', async (expect) => {
+      const r = MockDB.Assignments.update('asgn-001', 'faculty-999', { title: 'Hacked' });
+      expect(r.success).toBe(false);
+      expect(r.message).toBe('Unauthorized.');
+    });
+
+    it('updates assignment when authorized', async (expect) => {
+      const r = MockDB.Assignments.update('asgn-001', 'faculty-001', { title: 'Updated Title' });
+      expect(r.success).toBe(true);
+      expect(r.assignment.title).toBe('Updated Title');
+    });
+
+    it('deletes assignment when authorized', async (expect) => {
+      const create = MockDB.Assignments.create({
+        title: 'To Delete', description: 'test', facultyId: 'faculty-001',
+        facultyName: 'Faculty', deadline: futureDate, totalMarks: 10,
+      });
+      const del = MockDB.Assignments.delete(create.assignment.assignmentId, 'faculty-001');
+      expect(del.success).toBe(true);
+      const check = MockDB.Assignments.getById(create.assignment.assignmentId);
+      expect(check.success).toBe(false);
+    });
+  });
+
+  // ── Submission Tests ───────────────────────────────────────────────────────
+  describe('📤 Submission Management', () => {
+    it('submits valid assignment', async (expect) => {
+      const r = MockDB.Submissions.submit({
+        assignmentId: 'asgn-001',
+        studentId: 'student-001',
+        studentName: 'Alex Thompson',
+        fileName: 'report.pdf',
+        fileSize: 1024000,
+      });
+      expect(r.success).toBe(true);
+      expect(r.submission.isLate).toBe(false);
+    });
+
+    it('marks submission as late when deadline passed and allowLate=true', async (expect) => {
+      const r = MockDB.Submissions.submit({
+        assignmentId: 'asgn-002',
+        studentId: 'student-001',
+        studentName: 'Alex',
+        fileName: 'late.pdf',
+        fileSize: 500000,
+      });
+      // asgn-002 has future deadline, so not late
+      expect(r.success).toBe(true);
+    });
+
+    it('rejects submission after deadline when allowLate=false', async (expect) => {
+      const r = MockDB.Submissions.submit({
+        assignmentId: 'asgn-004', // closed assignment
+        studentId: 'student-001',
+        studentName: 'Alex',
+        fileName: 'report.pdf',
+        fileSize: 500,
+      });
+      // asgn-004 is past deadline with allowLate=false
+      expect(r.success).toBe(false);
+      expect(r.message).toContain('deadline');
+    });
+
+    it('retrieves student submissions', async (expect) => {
+      const r = MockDB.Submissions.getByStudent('student-001');
+      expect(r.success).toBe(true);
+      expect(Array.isArray(r.submissions)).toBeTruthy();
+      r.submissions.forEach(s => expect(s.studentId).toBe('student-001'));
+    });
+
+    it('retrieves submissions by assignment', async (expect) => {
+      const r = MockDB.Submissions.getByAssignment('asgn-001');
+      expect(r.success).toBe(true);
+      expect(Array.isArray(r.submissions)).toBeTruthy();
+    });
+
+    it('allows faculty to add grade', async (expect) => {
+      const subs = MockDB.Submissions.getByStudent('student-002');
+      if (subs.submissions.length > 0) {
+        const sub = subs.submissions[0];
+        const r = MockDB.Submissions.addGrade(sub.submissionId, 'faculty-001', { grade: 90, feedback: 'Excellent work!' });
+        expect(r.success).toBe(true);
+        expect(r.submission.grade).toBe(90);
+        expect(r.submission.feedback).toBe('Excellent work!');
+      }
+    });
+  });
+
+  // ── File Validation Tests ──────────────────────────────────────────────────
+  describe('📁 File Validation', () => {
+    it('accepts PDF files', async (expect) => {
+      const fakePdf = new File(['content'], 'report.pdf', { type: 'application/pdf' });
+      const v = validateFile(fakePdf);
+      expect(v.valid).toBe(true);
+    });
+
+    it('accepts DOCX files', async (expect) => {
+      const fakeDocx = new File(['content'], 'report.docx', { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+      const v = validateFile(fakeDocx);
+      expect(v.valid).toBe(true);
+    });
+
+    it('rejects EXE files', async (expect) => {
+      const fake = new File(['content'], 'virus.exe', { type: 'application/octet-stream' });
+      const v = validateFile(fake);
+      expect(v.valid).toBe(false);
+      expect(v.message).toContain('Invalid file type');
+    });
+
+    it('rejects files over 25MB', async (expect) => {
+      const big = new File([new ArrayBuffer(26 * 1024 * 1024)], 'big.pdf', { type: 'application/pdf' });
+      const v = validateFile(big);
+      expect(v.valid).toBe(false);
+      expect(v.message).toContain('25MB');
+    });
+
+    it('rejects PNG image files', async (expect) => {
+      const fake = new File(['content'], 'image.png', { type: 'image/png' });
+      const v = validateFile(fake);
+      expect(v.valid).toBe(false);
+    });
+
+    it('generates downloadable PDF data url for attachments', async (expect) => {
+      const res = MockDB.Files.getDownloadUrl('assignment_docs/guide.pdf', 'guide.pdf');
+      expect(res.success).toBe(true);
+      expect(typeof res.downloadUrl).toBe('string');
+      expect(res.downloadUrl.startsWith('data:application/pdf')).toBe(true);
+    });
+  });
+
+  // ── UI Utility Tests ───────────────────────────────────────────────────────
+  describe('🛠️ UI Utilities', () => {
+    it('formats file size correctly', async (expect) => {
+      expect(formatFileSize(0)).toBe('—');
+      expect(formatFileSize(500)).toBe('500 B');
+      expect(formatFileSize(1024)).toBe('1.0 KB');
+      expect(formatFileSize(1048576)).toBe('1.0 MB');
+      expect(formatFileSize(2621440)).toBe('2.5 MB');
+    });
+
+    it('correctly detects passed deadlines', async (expect) => {
+      const past   = new Date(Date.now() - 86400000).toISOString();
+      const future = new Date(Date.now() + 86400000).toISOString();
+      expect(isDeadlinePassed(past)).toBe(true);
+      expect(isDeadlinePassed(future)).toBe(false);
+    });
+
+    it('generates correct initials', async (expect) => {
+      expect(getInitials('John Doe')).toBe('JD');
+      expect(getInitials('Alice')).toBe('AL');
+      expect(getInitials('')).toBe('U');
+    });
+
+    it('formats dates correctly', async (expect) => {
+      const d = formatDate('2024-06-15T12:00:00Z');
+      expect(d).toContain('Jun');
+      expect(d).toContain('15');
+    });
+
+    it('escapes HTML to prevent XSS', async (expect) => {
+      const unsafe = '<script>alert("xss")</script>';
+      const safe   = escapeHtml(unsafe);
+      expect(safe).toContain('&lt;');
+      expect(safe).toContain('&gt;');
+      expect(safe.includes('<script>')).toBe(false);
+    });
+
+    it('paginates arrays correctly', async (expect) => {
+      const items = Array.from({ length: 25 }, (_, i) => i);
+      const pg1 = paginate(items, 1, 10);
+      expect(pg1.items.length).toBe(10);
+      expect(pg1.total).toBe(25);
+      expect(pg1.pages).toBe(3);
+      const pg3 = paginate(items, 3, 10);
+      expect(pg3.items.length).toBe(5);
+    });
+
+    it('deadline countdown returns correct status', async (expect) => {
+      const past = deadlineCountdown(new Date(Date.now() - 1000).toISOString());
+      expect(past.expired).toBe(true);
+      expect(past.text).toBe('Expired');
+
+      const future = deadlineCountdown(new Date(Date.now() + 10 * 86400000).toISOString());
+      expect(future.expired).toBe(false);
+    });
+  });
+
+  // ── Role Access Control Tests ─────────────────────────────────────────────
+  describe('🔒 Authorization & Access Control', () => {
+    it('cannot delete another faculty\'s assignment', async (expect) => {
+      const r = MockDB.Assignments.delete('asgn-001', 'faculty-ATTACKER');
+      expect(r.success).toBe(false);
+      expect(r.message).toBe('Unauthorized.');
+    });
+
+    it('cannot update another faculty\'s assignment', async (expect) => {
+      const r = MockDB.Assignments.update('asgn-001', 'faculty-ATTACKER', { title: 'Hacked' });
+      expect(r.success).toBe(false);
+    });
+
+    it('student profile not visible to other users in mock', async (expect) => {
+      const r1 = MockDB.Auth.getProfile('student-001');
+      expect(r1.success).toBe(true);
+      const r2 = MockDB.Auth.getProfile('nonexistent-user');
+      expect(r2.success).toBe(false);
+    });
+  });
+
+  // ── Stats Tests ───────────────────────────────────────────────────────────
+  describe('📊 Statistics', () => {
+    it('computes student stats', async (expect) => {
+      const s = MockDB.Stats.forStudent('student-001');
+      expect(typeof s.total).toBe('number');
+      expect(typeof s.submitted).toBe('number');
+      expect(typeof s.pending).toBe('number');
+      expect(s.total).toBe(s.submitted + s.pending + s.overdue);
+    });
+
+    it('computes faculty stats', async (expect) => {
+      const s = MockDB.Stats.forFaculty('faculty-001');
+      expect(typeof s.totalAssignments).toBe('number');
+      expect(typeof s.totalSubmissions).toBe('number');
+      expect(s.totalAssignments >= 0).toBe(true);
+    });
+  });
+
+  // ─── Test Runner ─────────────────────────────────────────────────────────
+  let totalTests = 0;
+  TestRunner.suites.forEach(s => s.tests.forEach(() => totalTests++));
+
+  async function runAllTests() {
+    const btn = document.getElementById('run-btn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Running…';
+    document.getElementById('log').textContent = 'Starting test run…\n';
+
+    let done = 0;
+    const startAll = Date.now();
+
+    const results = await TestRunner.run((total) => {
+      done++;
+      document.getElementById('progress-fill').style.width = `${(done / totalTests) * 100}%`;
+      document.getElementById('progress-text').textContent = `${done} / ${totalTests}`;
+    });
+
+    // Render results
+    document.getElementById('s-total').textContent = results.total;
+    document.getElementById('s-pass').textContent  = results.pass;
+    document.getElementById('s-fail').textContent  = results.fail;
+    document.getElementById('s-time').textContent  = results.elapsed;
+
+    const suitesEl = document.getElementById('suites');
+    suitesEl.innerHTML = results.suites.map(suite => {
+      const suitePass = suite.tests.filter(t => t.status === 'pass').length;
+      const suiteFail = suite.tests.filter(t => t.status === 'fail').length;
+      return `
+      <div class="suite">
+        <div class="suite-header">
+          <span>${escapeHtml(suite.name)}</span>
+          <div class="suite-badge">
+            <span class="badge pass">${suitePass} ✓</span>
+            ${suiteFail ? `<span class="badge fail">${suiteFail} ✗</span>` : ''}
+          </div>
+        </div>
+        ${suite.tests.map(t => `
+          <div class="test-case">
+            <div class="test-icon ${t.status}">${t.status === 'pass' ? '✓' : '✗'}</div>
+            <div class="test-name">
+              <div>${escapeHtml(t.name)}</div>
+              ${t.error ? `<div class="test-desc" style="color:#fca5a5;">✗ ${escapeHtml(t.error)}</div>` : ''}
+            </div>
+            <div class="test-time">${t.elapsed}ms</div>
+          </div>`).join('')}
+      </div>`;
+    }).join('');
+
+    const log = document.getElementById('log');
+    log.textContent = `Test run completed in ${results.elapsed}ms\n`;
+    log.textContent += `✅ Passed: ${results.pass} | ❌ Failed: ${results.fail} | Total: ${results.total}\n\n`;
+    results.suites.forEach(suite => {
+      suite.tests.filter(t => t.status === 'fail').forEach(t => {
+        log.textContent += `FAIL: [${suite.name}] ${t.name}\n  → ${t.error}\n\n`;
+      });
+    });
+
+    btn.disabled = false;
+    btn.textContent = '▶ Run Again';
+
+    if (results.fail === 0) {
+      log.textContent += '🎉 All tests passed!';
+    }
+  }
+  </script>
+</body>
+</html>
