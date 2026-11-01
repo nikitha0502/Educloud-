@@ -76,7 +76,7 @@ const API = (() => {
       },
     };
     if (body) opts.body = JSON.stringify(body);
-    const res = await fetch(`${APP_CONFIG.AWS.API_GATEWAY_URL}${path}`, opts);
+    const res = await fetch(`${APP_CONFIG.BACKEND_URL}${path}`, opts);
     const data = await res.json();
     if (!res.ok) throw new Error(data.message || 'API error');
     return data;
