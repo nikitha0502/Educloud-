@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Assignments — EduCloud</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/design-system.css" />
+</head>
+<body>
+  <div id="toast-container"></div>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <div class="app-layout">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-logo">
+        <div class="sidebar-logo-icon">🎓</div>
+        <div><div class="sidebar-logo-text">EduCloud</div><div class="sidebar-logo-sub">Faculty Portal</div></div>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="nav-section"><span class="nav-section-label">Main</span></div>
+        <a class="nav-item" href="faculty-dashboard.html"><span class="nav-icon">🏠</span> Dashboard</a>
+        <a class="nav-item active" href="faculty-assignments.html"><span class="nav-icon">📚</span> My Assignments</a>
+        <a class="nav-item" href="create-assignment.html"><span class="nav-icon">➕</span> Create Assignment</a>
+        <a class="nav-item" href="faculty-submissions.html"><span class="nav-icon">📥</span> Submissions</a>
+        <div class="nav-section"><span class="nav-section-label">Account</span></div>
+        <a class="nav-item" href="profile.html"><span class="nav-icon">👤</span> Profile</a>
+        <a class="nav-item" onclick="logout()"><span class="nav-icon">🚪</span> Sign Out</a>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="user-widget">
+          <div class="user-avatar" id="sidebar-avatar">FC</div>
+          <div><div class="user-name" id="sidebar-name">Faculty</div><div class="user-role">Faculty</div></div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar">
+        <button class="menu-toggle btn btn-ghost btn-icon" id="menu-toggle">☰</button>
+        <h1 class="topbar-title">My Assignments</h1>
+        <div class="topbar-actions">
+          <a href="create-assignment.html" class="btn btn-primary btn-sm">➕ Create New</a>
+        </div>
+      </header>
+
+      <div class="page-content" id="page-content">
+        <div class="spinner"></div>
+      </div>
+    </main>
+  </div>
+
+  <script src="../js/config.js"></script>
+  <script src="../js/mock-db.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/utils.js"></script>
+  <script>
+    const user = API.requireRole('faculty', 'login.html');
+    if (!user) throw new Error();
+
+    showMockBanner();
+    document.getElementById('sidebar-name').textContent = user.name;
+    document.getElementById('sidebar-avatar').textContent = getInitials(user.name);
+
+    document.getElementById('menu-toggle').addEventListener('click', () => {
+      document.getElementById('sidebar').classList.toggle('mobile-open');
+      document.getElementById('sidebar-overlay').classList.toggle('active');
+    });
+
+    let allAssignments = [], allSubmissions = [];
+    let query = '', statusFilter = 'all', page = 1;
+
+    async function load() {
+      const [ar, sr] = await Promise.all([
+        API.Assignments.getByFaculty(user.userId),
+        API.Submissions.getByFaculty(user.userId),
+      ]);
+      allAssignments = ar.assignments || [];
+      allSubmissions = sr.submissions || [];
+      renderPage();
+    }
+
+    function renderPage() {
+      const now = new Date();
+      let filtered = allAssignments.filter(a => {
+        if (query) {
+          const q = query.toLowerCase();
+          if (!a.title.toLowerCase().includes(q) && !(a.description||'').toLowerCase().includes(q)) return false;
+        }
+        const expired = new Date(a.deadline) < now;
+        if (statusFilter === 'active' && expired) return false;
+        if (statusFilter === 'closed' && !expired) return false;
+        return true;
+      }).sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
+
+      const submissionCount = {};
+      allSubmissions.forEach(s => { submissionCount[s.assignmentId] = (submissionCount[s.assignmentId] || 0) + 1; });
+
+      const pg = paginate(filtered, page, APP_CONFIG.PAGE_SIZE);
+
+      const html = `
+        <div class="page-header">
+          <div class="page-header-text">
+            <h2>📚 My Assignments</h2>
+            <p>${filtered.length} assignment${filtered.length !== 1 ? 's' : ''}</p>
+          </div>
+          <a href="create-assignment.html" class="btn btn-primary">➕ Create Assignment</a>
+        </div>
+
+        <div class="filter-bar" style="margin-bottom:var(--space-5);">
+          <div class="filter-search">
+            <span class="search-icon">🔍</span>
+            <input type="text" placeholder="Search…" id="search-input" value="${escapeHtml(query)}" />
+          </div>
+          <select class="form-control" id="status-filter" style="max-width:140px;">
+            <option value="all" ${statusFilter==='all'?'selected':''}>All</option>
+            <option value="active" ${statusFilter==='active'?'selected':''}>Active</option>
+            <option value="closed" ${statusFilter==='closed'?'selected':''}>Closed</option>
+          </select>
+        </div>
+
+        ${pg.items.length === 0
+          ? `<div class="empty-state"><div class="empty-state-icon">📭</div><h3>No assignments found</h3><p><a href="create-assignment.html">Create your first assignment</a></p></div>`
+          : `<div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Assignment</th>
+                    <th>Deadline</th>
+                    <th>Status</th>
+                    <th>Submissions</th>
+                    <th>Marks</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${pg.items.map(a => {
+                    const sCount = submissionCount[a.assignmentId] || 0;
+                    const cd = deadlineCountdown(a.deadline);
+                    return `
+                    <tr>
+                      <td>
+                        <div style="font-weight:700;">${escapeHtml(a.title)}</div>
+                        <div style="font-size:.75rem;color:var(--gray-500);max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(a.description)}</div>
+                      </td>
+                      <td>
+                        <div>${formatDate(a.deadline)}</div>
+                        <div class="${cd.class}" style="font-size:.75rem;">${cd.text}</div>
+                      </td>
+                      <td>${assignmentStatusBadge(a.status, a.deadline)}</td>
+                      <td><span class="badge badge-info">${sCount}</span></td>
+                      <td>${a.totalMarks}</td>
+                      <td>
+                        <div class="table-actions">
+                          <a href="assignment-detail.html?id=${a.assignmentId}" class="btn btn-ghost btn-sm">View</a>
+                          <a href="faculty-submissions.html?assignmentId=${a.assignmentId}" class="btn btn-outline btn-sm">Subs</a>
+                          <a href="create-assignment.html?edit=${a.assignmentId}" class="btn btn-ghost btn-sm">✏️</a>
+                          <button class="btn btn-danger btn-sm" onclick="del('${a.assignmentId}','${escapeHtml(a.title)}')">🗑️</button>
+                        </div>
+                      </td>
+                    </tr>`;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
+            <div id="pagination-container"></div>`
+        }
+      `;
+
+      document.getElementById('page-content').innerHTML = html;
+
+      document.getElementById('search-input')?.addEventListener('input', debounce(e => { query = e.target.value; page = 1; renderPage(); }, 300));
+      document.getElementById('status-filter')?.addEventListener('change', e => { statusFilter = e.target.value; page = 1; renderPage(); });
+      renderPagination('pagination-container', pg, p => { page = p; renderPage(); });
+    }
+
+    async function del(id, title) {
+      if (!confirm(`Delete "${title}"?`)) return;
+      showLoading('Deleting…');
+      const res = await API.Assignments.delete(id);
+      hideLoading();
+      if (res.success) { showToast('Deleted.', 'success'); load(); }
+      else showToast(res.message, 'danger');
+    }
+
+    load();
+  </script>
+</body>
+</html>
