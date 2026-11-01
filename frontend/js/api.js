@@ -5,8 +5,26 @@
 
 const API = (() => {
 
-  // ─── Session ─────────────────────────────────────────────────────────────
-  // Use localStorage as primary so login persists across pages opened from file://
+  // ─── CONFIG ───────────────────────────────────────────────────────────────
+  const APP_CONFIG = {
+    // ----------------------------------------------------------------------
+    // Backend URL – change only if you redeploy elsewhere.
+    // ----------------------------------------------------------------------
+    BACKEND_URL: 'https://educloud-backendd.onrender.com', // <-- live Render endpoint
+
+    // ----------------------------------------------------------------------
+    // Toggle between mock data (true) and real backend (false).
+    // ----------------------------------------------------------------------
+    USE_MOCK: false,
+
+    // ----------------------------------------------------------------------
+    // Local‑storage keys – keep these unchanged.
+    // ----------------------------------------------------------------------
+    SESSION_KEY: 'educloud-session',
+    TOKEN_KEY:   'educloud-token',
+  };
+
+  // ─── Session helpers ─────────────────────────────────────────────────────
   function getCurrentUser() {
     try {
       const raw = localStorage.getItem(APP_CONFIG.SESSION_KEY);
@@ -65,7 +83,7 @@ const API = (() => {
     return user;
   }
 
-  // ─── Real HTTP helper ─────────────────────────────────────────────────────
+  // ─── Real HTTP helper ───────────────────────────────────────────────────
   async function http(method, path, body = null) {
     const token = getToken();
     const opts = {
@@ -82,10 +100,10 @@ const API = (() => {
     return data;
   }
 
-  // ─── Simulated network delay for mock ─────────────────────────────────────
+  // ─── Simulated network delay for mock ───────────────────────────────────
   function delay(ms = 350) { return new Promise(r => setTimeout(r, ms)); }
 
-  // ─── AUTH API ─────────────────────────────────────────────────────────────
+  // ─── AUTH API ───────────────────────────────────────────────────────────
   const Auth = {
     async register(payload) {
       if (APP_CONFIG.USE_MOCK) { await delay(); return MockDB.Auth.register(payload); }
@@ -113,7 +131,7 @@ const API = (() => {
     },
   };
 
-  // ─── ASSIGNMENTS API ───────────────────────────────────────────────────────
+  // ─── ASSIGNMENTS API ───────────────────────────────────────────────────
   const Assignments = {
     async create(payload) {
       if (APP_CONFIG.USE_MOCK) { await delay(); return MockDB.Assignments.create(payload); }
@@ -143,7 +161,7 @@ const API = (() => {
     },
   };
 
-  // ─── SUBMISSIONS API ───────────────────────────────────────────────────────
+  // ─── SUBMISSIONS API ───────────────────────────────────────────────────
   const Submissions = {
     async submit(payload) {
       if (APP_CONFIG.USE_MOCK) { await delay(500); return MockDB.Submissions.submit(payload); }
@@ -172,7 +190,7 @@ const API = (() => {
     },
   };
 
-  // ─── FILES API ─────────────────────────────────────────────────────────────
+  // ─── FILES API ────────────────────────────────────────────────────────
   const Files = {
     async getUploadUrl(fileName, contentType) {
       if (APP_CONFIG.USE_MOCK) { await delay(100); return MockDB.Files.getUploadUrl(fileName, contentType); }
@@ -199,7 +217,7 @@ const API = (() => {
     },
   };
 
-  // ─── STATS API ─────────────────────────────────────────────────────────────
+  // ─── STATS API ────────────────────────────────────────────────────────
   const Stats = {
     async forStudent(studentId) {
       if (APP_CONFIG.USE_MOCK) { await delay(100); return MockDB.Stats.forStudent(studentId); }
@@ -211,7 +229,20 @@ const API = (() => {
     },
   };
 
-  return { getCurrentUser, setCurrentUser, clearSession, getToken, requireAuth, requireRole, Auth, Assignments, Submissions, Files, Stats };
+  // Export the public API
+  return {
+    getCurrentUser,
+    setCurrentUser,
+    clearSession,
+    getToken,
+    requireAuth,
+    requireRole,
+    Auth,
+    Assignments,
+    Submissions,
+    Files,
+    Stats,
+  };
 })();
 
 window.API = API;
