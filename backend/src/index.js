@@ -108,9 +108,20 @@ function wrap(handler, pathParamFn) {
 const app = express();
 
 app.use(cors({
-  origin: process.env.FRONTEND_URL || '*',
+  origin: [
+    'https://educloud-frontend-one.vercel.app',
+    // Allow any *.vercel.app preview URL (Vercel deploy previews)
+    /^https:\/\/educloud-.*\.vercel\.app$/,
+    // Allow local dev
+    'http://localhost:3000',
+    'http://localhost:5500',
+    'http://127.0.0.1:5500',
+    // Also honour FRONTEND_URL env var set in Render dashboard
+    ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
+  ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
 }));
 
 app.use(express.json({ limit: '10mb' }));
